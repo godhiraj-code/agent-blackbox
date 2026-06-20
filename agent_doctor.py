@@ -139,9 +139,11 @@ def diagnose_cron_job(job: dict, hermes_home: Path = DEFAULT_HERMES_HOME) -> dic
     combined = f"{last_error}\n{output_text}".lower()
 
     status = "ok" if job.get("last_status") == "ok" else "cron_error"
-    root_cause = "unknown"
+    root_cause = "none" if status == "ok" else "unknown"
     recommendations: list[str] = []
 
+    if status == "ok":
+        recommendations.append("Latest cron run completed successfully. If output is empty, that is expected for a silent no_agent watchdog with no new mail.")
     if "script timed out" in combined or "timed out after" in combined or "timeoutexpired" in combined:
         root_cause = "script_timeout"
         status = "script_timed_out"
