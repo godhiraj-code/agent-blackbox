@@ -1,6 +1,7 @@
 import datetime as dt
+import json
 
-from agent_doctor import diagnose_no_response, parse_log_line, sanitize
+from agent_doctor import diagnose_cron_job, diagnose_no_response, find_cron_job, parse_log_line, sanitize
 
 
 def test_parse_discord_connected():
@@ -60,3 +61,42 @@ def test_sanitize_redacts_common_secret_shapes():
     redacted = sanitize(text)
     assert "secretvalue" not in redacted
     assert "normal text" in redacted
+
+
+def test_find_and_diagnose_cron_timeout(tmp_path):
+    hermes_home = tmp_path / "hermes"
+    cron_dir = hermes_home / "cron"
+    out_dir = cron_dir / "output" / "37a425324ce9"
+    out_dir.mkdir(parents=True)
+    (cron_dir / "jobs.json").write_text(
+        json.dumps(
+            {
+                "jobs": [
+                    {
+                        "id": "37a425324ce9",
+                        "name": "Atomic Mail inbox watcher",
+                        "script": "atomicmail_poll.py",
+                        "no_agent": True,
+                        "last_status": "error",
+                        "last_run_at": "2026-06-20T22:09:14.540220+05:30",
+                        "next_run_at": "2026-06-20T23:09:14.540220+05:30",
+                        "last_error": "Script timed out after 120s: C:\\Users\\dhira\\AppData\\Local\\hermes\\scripts\\atomicmail_poll.py",
+                        "last_delivery_error": None,
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    (out_dir / "2026-06-20_22-09-13.md").write_text(
+        "# Cron Job: Atomic Mail inbox watcher\n\n**Status:** script failed\n\nScript timed out after 120s: C:\\Users\\dhira\\AppData\\Local\\hermes\\scripts\\atomicmail_poll.py\n",
+        encoding="utf-8",
+    )
+
+    job = find_cron_job("Atomic Mail", hermes_home)
+    assert job["id"] == "37a425324ce9"
+    diagnosis = diagnose_cron_job(job, hermes_home)
+    assert diagnosis["status"] == "script_timed_out"
+    assert diagnosis["root_cause"] == "script_timeout"
+    assert diagnosis["latest_output_path"].endswith("2026-06-20_22-09-13.md")
+    assert any("npx atomicmail" in item for item in diagnosis["recommendations"])

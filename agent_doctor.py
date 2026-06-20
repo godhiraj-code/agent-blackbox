@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import json
 import re
 import subprocess
 from dataclasses import dataclass
@@ -80,6 +81,14 @@ def log_path(hermes_home: Path = DEFAULT_HERMES_HOME) -> Path:
     return hermes_home / "logs" / "gateway.log"
 
 
+def cron_jobs_path(hermes_home: Path = DEFAULT_HERMES_HOME) -> Path:
+    return hermes_home / "cron" / "jobs.json"
+
+
+def cron_output_dir(job_id: str, hermes_home: Path = DEFAULT_HERMES_HOME) -> Path:
+    return hermes_home / "cron" / "output" / job_id
+
+
 def read_events(minutes: int, hermes_home: Path = DEFAULT_HERMES_HOME) -> list[Event]:
     path = log_path(hermes_home)
     if not path.exists():
@@ -94,6 +103,110 @@ def read_events(minutes: int, hermes_home: Path = DEFAULT_HERMES_HOME) -> list[E
             continue
         events.append(event)
     return events
+
+
+def read_cron_jobs(hermes_home: Path = DEFAULT_HERMES_HOME) -> list[dict]:
+    path = cron_jobs_path(hermes_home)
+    if not path.exists():
+        return []
+    data = json.loads(path.read_text(encoding="utf-8"))
+    return data.get("jobs", [])
+
+
+def find_cron_job(job_ref: str, hermes_home: Path = DEFAULT_HERMES_HOME) -> dict | None:
+    needle = job_ref.lower()
+    for job in read_cron_jobs(hermes_home):
+        if job.get("id", "").lower() == needle:
+            return job
+        if needle in job.get("name", "").lower():
+            return job
+    return None
+
+
+def latest_cron_output(job_id: str, hermes_home: Path = DEFAULT_HERMES_HOME) -> Path | None:
+    out_dir = cron_output_dir(job_id, hermes_home)
+    if not out_dir.exists():
+        return None
+    files = sorted(out_dir.glob("*.md"), key=lambda p: p.stat().st_mtime, reverse=True)
+    return files[0] if files else None
+
+
+def diagnose_cron_job(job: dict, hermes_home: Path = DEFAULT_HERMES_HOME) -> dict:
+    job_id = job.get("id", "")
+    output_path = latest_cron_output(job_id, hermes_home)
+    output_text = output_path.read_text(encoding="utf-8", errors="ignore") if output_path else ""
+    last_error = job.get("last_error") or ""
+    combined = f"{last_error}\n{output_text}".lower()
+
+    status = "ok" if job.get("last_status") == "ok" else "cron_error"
+    root_cause = "unknown"
+    recommendations: list[str] = []
+
+    if "script timed out" in combined or "timed out after" in combined or "timeoutexpired" in combined:
+        root_cause = "script_timeout"
+        status = "script_timed_out"
+        recommendations.append("The cron wrapper hit its 120s script timeout. The failing layer is the script/subprocess, not Discord delivery.")
+    if "atomicmail_poll.py" in combined and "npx" in combined or job.get("script") == "atomicmail_poll.py":
+        recommendations.append("For Atomic Mail, inspect the nested npx atomicmail jmap_request call; it is the likely blocking dependency.")
+    if job.get("no_agent"):
+        recommendations.append("This is a no_agent script-only watchdog: empty stdout is silent, but non-zero exit/timeout becomes a cron error alert.")
+    if job.get("last_delivery_error"):
+        recommendations.append("Delivery also reported an error; inspect last_delivery_error separately.")
+    if not recommendations:
+        recommendations.append("Inspect the latest cron output file and rerun the script manually with a shorter internal timeout.")
+
+    return {
+        "job_id": job_id,
+        "name": job.get("name"),
+        "status": status,
+        "last_status": job.get("last_status"),
+        "last_run_at": job.get("last_run_at"),
+        "next_run_at": job.get("next_run_at"),
+        "script": job.get("script"),
+        "no_agent": job.get("no_agent"),
+        "last_error": sanitize(last_error) if last_error else None,
+        "latest_output_path": str(output_path) if output_path else None,
+        "latest_output_excerpt": sanitize(output_text[:1200]) if output_text else None,
+        "root_cause": root_cause,
+        "recommendations": recommendations,
+    }
+
+
+def cron_postmortem(diagnosis: dict) -> str:
+    lines = [
+        "# Cron Job Incident Postmortem",
+        "",
+        f"Generated at: {dt.datetime.now().isoformat(sep=' ', timespec='seconds')}",
+        f"Job: `{diagnosis['name']}` (`{diagnosis['job_id']}`)",
+        "",
+        "## Diagnosis",
+        "",
+        f"Status: `{diagnosis['status']}`",
+        f"Root cause: `{diagnosis['root_cause']}`",
+        f"Last status: `{diagnosis['last_status']}`",
+        f"Last run: `{diagnosis['last_run_at']}`",
+        f"Next run: `{diagnosis['next_run_at']}`",
+        f"Script: `{diagnosis['script']}`",
+        f"No-agent mode: `{diagnosis['no_agent']}`",
+        "",
+        "## Last Error",
+        "",
+        diagnosis["last_error"] or "No last_error recorded.",
+        "",
+        "## Latest Output",
+        "",
+        f"Path: `{diagnosis['latest_output_path']}`",
+        "",
+        "```text",
+        diagnosis["latest_output_excerpt"] or "No output file found.",
+        "```",
+        "",
+        "## Recommended Next Steps",
+        "",
+    ]
+    lines.extend(f"- {item}" for item in diagnosis["recommendations"])
+    lines.append("")
+    return "\n".join(lines)
 
 
 def diagnose_no_response(events: Iterable[Event], platform: str) -> dict:
@@ -263,6 +376,40 @@ def cmd_search(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_cron(args: argparse.Namespace) -> int:
+    job = find_cron_job(args.job, Path(args.hermes_home))
+    if not job:
+        print(f"No cron job found for {args.job!r}")
+        return 2
+    diagnosis = diagnose_cron_job(job, Path(args.hermes_home))
+    print(f"job: {diagnosis['name']} ({diagnosis['job_id']})")
+    print(f"status: {diagnosis['status']}")
+    print(f"root_cause: {diagnosis['root_cause']}")
+    print(f"last_status: {diagnosis['last_status']}")
+    print(f"last_run_at: {diagnosis['last_run_at']}")
+    print(f"next_run_at: {diagnosis['next_run_at']}")
+    print(f"script: {diagnosis['script']}")
+    print(f"latest_output_path: {diagnosis['latest_output_path']}")
+    if diagnosis["last_error"]:
+        print(f"last_error: {diagnosis['last_error']}")
+    for item in diagnosis["recommendations"]:
+        print(f"recommendation: {item}")
+    return 0
+
+
+def cmd_export_cron(args: argparse.Namespace) -> int:
+    job = find_cron_job(args.job, Path(args.hermes_home))
+    if not job:
+        print(f"No cron job found for {args.job!r}")
+        return 2
+    diagnosis = diagnose_cron_job(job, Path(args.hermes_home))
+    out = Path(args.out)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(cron_postmortem(diagnosis), encoding="utf-8")
+    print(f"wrote {out}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Local-first flight recorder for AI coding agents")
     parser.add_argument("--hermes-home", default=str(DEFAULT_HERMES_HOME))
@@ -291,6 +438,15 @@ def build_parser() -> argparse.ArgumentParser:
     search.add_argument("query")
     search.add_argument("--minutes", type=int, default=1440)
     search.set_defaults(func=cmd_search)
+
+    cron = sub.add_parser("cron")
+    cron.add_argument("job", help="Cron job id or name substring")
+    cron.set_defaults(func=cmd_cron)
+
+    export_cron = sub.add_parser("export-cron-postmortem")
+    export_cron.add_argument("job", help="Cron job id or name substring")
+    export_cron.add_argument("--out", required=True)
+    export_cron.set_defaults(func=cmd_export_cron)
     return parser
 
 
