@@ -1,7 +1,8 @@
 import datetime as dt
 import json
+from pathlib import Path
 
-from agent_doctor import diagnose_cron_job, diagnose_no_response, find_cron_job, parse_log_line, sanitize
+from agent_doctor import build_parser, cmd_demo, correlate_inbound_flushes, diagnose_cron_job, diagnose_no_response, find_cron_job, parse_log_line, sanitize
 
 
 def test_parse_discord_connected():
@@ -44,7 +45,22 @@ def test_diagnosis_response_flushed_with_unrelated_telegram_noise():
     assert diagnosis["flush_count"] == 1
     assert diagnosis["unrelated_noise_count"] == 1
     assert diagnosis["cache_invalidation_count"] == 1
+    assert diagnosis["message_trace"][0]["responded"] is True
+    assert diagnosis["message_trace"][0]["latency_seconds"] == 47
     assert any("delay/busy-turn" in note for note in diagnosis["notes"])
+
+
+def test_message_correlation_flags_latest_unresponded_message():
+    lines = [
+        "2026-06-20 21:57:00,000 INFO gateway.run: inbound message: platform=discord user=Dhiraj chat=1 msg='first' reply_to_id=None reply_to_text=''",
+        "2026-06-20 21:57:10,000 INFO hermes_plugins.discord_platform.adapter: [Discord] Flushing text batch agent:main:discord:dm:1 (88 chars)",
+        "2026-06-20 21:58:00,000 INFO gateway.run: inbound message: platform=discord user=Dhiraj chat=1 msg='second' reply_to_id=None reply_to_text=''",
+    ]
+    diagnosis = diagnose_no_response([parse_log_line(line) for line in lines], "discord")
+    assert diagnosis["status"] == "agent_busy_or_response_pending"
+    assert diagnosis["message_trace"][0]["responded"] is True
+    assert diagnosis["message_trace"][0]["latency_seconds"] == 10
+    assert diagnosis["message_trace"][1]["responded"] is False
 
 
 def test_diagnosis_agent_busy_or_pending():
@@ -100,3 +116,16 @@ def test_find_and_diagnose_cron_timeout(tmp_path):
     assert diagnosis["root_cause"] == "script_timeout"
     assert diagnosis["latest_output_path"].endswith("2026-06-20_22-09-13.md")
     assert any("npx atomicmail" in item for item in diagnosis["recommendations"])
+
+
+def test_demo_runs_full_pipeline_and_writes_report(tmp_path):
+    demo_log = Path(__file__).parent / "examples" / "demo_gateway.txt"
+    output = tmp_path / "demo-postmortem.md"
+    args = build_parser().parse_args(["demo", "--log", str(demo_log), "--out", str(output)])
+
+    assert cmd_demo(args) == 0
+    report = output.read_text(encoding="utf-8")
+    assert "Status: `response_flushed`" in report
+    assert "Unrelated platform reconnect noise" in report
+    assert "demo-secret-value" not in report
+    assert "[REDACTED_SECRET]" in report

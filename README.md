@@ -34,8 +34,27 @@ python agent_doctor.py doctor
 python agent_doctor.py gateway --minutes 180
 python agent_doctor.py why-no-response --platform discord --minutes 180
 python agent_doctor.py export-postmortem --minutes 180 --out exports/latest-postmortem.md
+python agent_doctor.py cron "Atomic Mail"
+python agent_doctor.py export-cron-postmortem "Atomic Mail" --out exports/atomicmail-cron-postmortem.md
 python agent_doctor.py search "Discord"
 ```
+
+The `why-no-response` command now correlates each inbound message with the next outbound flush and reports per-message latency/pending status. This avoids the weak first-pass behavior where one flush inside a time window could make a later unresponded message look healthy.
+
+## Try the Demo
+
+No Hermes installation or private logs are needed:
+
+```bash
+python agent_doctor.py demo
+```
+
+The command runs a safe sample incident through the real parser and diagnosis
+engine, prints the reconstructed timeline, and writes a sanitized report to
+`exports/demo-postmortem.md`.
+
+For the architecture and design decisions, read
+[`docs/blog/building-a-local-first-flight-recorder.md`](docs/blog/building-a-local-first-flight-recorder.md).
 
 ## Current Status
 

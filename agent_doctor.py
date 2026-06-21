@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Iterable
 
 DEFAULT_HERMES_HOME = Path.home() / "AppData" / "Local" / "hermes"
+DEFAULT_DEMO_LOG = Path(__file__).parent / "examples" / "demo_gateway.txt"
 SECRET_PATTERNS = [
     re.compile(r"(?i)(api[_-]?key|token|secret|password|authorization)[:=]\s*[^\s,;]+"),
     re.compile(r"(?i)bearer\s+[a-z0-9._\-]+"),
@@ -227,13 +228,19 @@ def diagnose_no_response(events: Iterable[Event], platform: str) -> dict:
         if e.severity in {"WARNING", "ERROR", "CRITICAL"} and e.platform == platform
     ]
 
+    message_trace = correlate_inbound_flushes(inbound, flushes)
+
     status = "unknown_needs_deeper_trace"
     if not connected and not inbound:
         status = "message_not_seen_or_gateway_down"
     elif inbound and flushes:
-        latest_inbound_ts = max((e.timestamp for e in inbound if e.timestamp), default=None)
-        later_flushes = [e for e in flushes if latest_inbound_ts is None or (e.timestamp and e.timestamp >= latest_inbound_ts)]
-        status = "response_flushed" if later_flushes else "response_may_have_flushed_before_latest_message"
+        latest = message_trace[-1] if message_trace else None
+        if latest and latest["responded"]:
+            status = "response_flushed"
+        elif any(not item["responded"] for item in message_trace):
+            status = "agent_busy_or_response_pending"
+        else:
+            status = "response_may_have_flushed_before_latest_message"
     elif inbound and not flushes:
         status = "agent_busy_or_response_pending"
     elif connected and not inbound:
@@ -249,8 +256,45 @@ def diagnose_no_response(events: Iterable[Event], platform: str) -> dict:
         "same_platform_error_count": len(same_platform_errors),
         "latest_inbound": inbound[-1].message if inbound else None,
         "latest_flush": flushes[-1].message if flushes else None,
+        "message_trace": message_trace,
         "notes": build_notes(status, unrelated_noise, cache, same_platform_errors),
     }
+
+
+def correlate_inbound_flushes(inbound: list[Event], flushes: list[Event]) -> list[dict]:
+    """Pair every inbound message with the next outbound flush after it.
+
+    Window-level counts are not good enough for a flight recorder. If three
+    messages arrive and one flush occurs, the tool must show which messages got
+    a later send-path event and which are still pending.
+    """
+    ordered_inbound = sorted(inbound, key=lambda e: e.timestamp or dt.datetime.min)
+    ordered_flushes = sorted(flushes, key=lambda e: e.timestamp or dt.datetime.min)
+    trace: list[dict] = []
+    for index, msg in enumerate(ordered_inbound, start=1):
+        msg_ts = msg.timestamp
+        next_flush = next(
+            (
+                flush
+                for flush in ordered_flushes
+                if msg_ts is None or flush.timestamp is None or flush.timestamp >= msg_ts
+            ),
+            None,
+        )
+        latency_seconds = None
+        if msg_ts and next_flush and next_flush.timestamp:
+            latency_seconds = int((next_flush.timestamp - msg_ts).total_seconds())
+        trace.append(
+            {
+                "index": index,
+                "timestamp": msg_ts.isoformat(sep=" ") if msg_ts else None,
+                "responded": next_flush is not None,
+                "latency_seconds": latency_seconds,
+                "inbound": msg.message,
+                "flush": next_flush.message if next_flush else None,
+            }
+        )
+    return trace
 
 
 def build_notes(status: str, unrelated_noise: list[Event], cache: list[Event], same_platform_errors: list[Event]) -> list[str]:
@@ -313,6 +357,12 @@ def postmortem(events: list[Event], diagnosis: dict, platform: str) -> str:
         lines.extend(f"- {note}" for note in diagnosis["notes"])
     else:
         lines.append("- No specific notes generated.")
+    if diagnosis.get("message_trace"):
+        lines.extend(["", "## Message correlation", ""])
+        for item in diagnosis["message_trace"]:
+            status = "responded" if item["responded"] else "pending"
+            latency = f"; latency: {item['latency_seconds']}s" if item["latency_seconds"] is not None else ""
+            lines.append(f"- Message #{item['index']} at `{item['timestamp']}`: `{status}`{latency}")
     lines.extend(["", "## Timeline", ""])
     for event in events:
         if event.event_type == "log_line":
@@ -352,6 +402,12 @@ def cmd_why(args: argparse.Namespace) -> int:
     print(f"inbound_count: {diagnosis['inbound_count']}")
     print(f"flush_count: {diagnosis['flush_count']}")
     print(f"unrelated_noise_count: {diagnosis['unrelated_noise_count']}")
+    if diagnosis.get("message_trace"):
+        print("message_trace:")
+        for item in diagnosis["message_trace"]:
+            status = "responded" if item["responded"] else "pending"
+            latency = f" latency={item['latency_seconds']}s" if item["latency_seconds"] is not None else ""
+            print(f"  #{item['index']} {status}{latency} at {item['timestamp']}")
     for note in diagnosis["notes"]:
         print(f"note: {note}")
     return 0
@@ -375,6 +431,35 @@ def cmd_search(args: argparse.Namespace) -> int:
         if q in event.message.lower():
             ts = event.timestamp.isoformat(sep=" ") if event.timestamp else "unknown-time"
             print(f"{ts} {event.message}")
+    return 0
+
+
+def cmd_demo(args: argparse.Namespace) -> int:
+    demo_log = Path(args.log)
+    if not demo_log.exists():
+        print(f"Demo log not found: {demo_log}")
+        return 2
+
+    events = [
+        event
+        for line in demo_log.read_text(encoding="utf-8", errors="ignore").splitlines()
+        if (event := parse_log_line(line)) is not None
+    ]
+    diagnosis = diagnose_no_response(events, args.platform)
+
+    print("Agent Blackbox demo")
+    print(f"sample: {demo_log}")
+    print(f"events parsed: {len(events)}")
+    print_gateway(events, args.platform)
+    print("\nDiagnosis")
+    print(f"status: {diagnosis['status']}")
+    for note in diagnosis["notes"]:
+        print(f"note: {note}")
+
+    out = Path(args.out)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(postmortem(events, diagnosis, args.platform), encoding="utf-8")
+    print(f"\nSanitized postmortem written to: {out}")
     return 0
 
 
@@ -440,6 +525,12 @@ def build_parser() -> argparse.ArgumentParser:
     search.add_argument("query")
     search.add_argument("--minutes", type=int, default=1440)
     search.set_defaults(func=cmd_search)
+
+    demo = sub.add_parser("demo", help="Run a safe sample incident through the full diagnosis pipeline")
+    demo.add_argument("--platform", default="discord")
+    demo.add_argument("--log", default=str(DEFAULT_DEMO_LOG))
+    demo.add_argument("--out", default="exports/demo-postmortem.md")
+    demo.set_defaults(func=cmd_demo)
 
     cron = sub.add_parser("cron")
     cron.add_argument("job", help="Cron job id or name substring")
