@@ -3,8 +3,12 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import json
+import os
 import re
 import subprocess
+import sys
+import threading
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
@@ -497,6 +501,83 @@ def cmd_export_cron(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_record(args: argparse.Namespace) -> int:
+    cmd_args = list(args.cmd_args or [])
+    if cmd_args and cmd_args[0] == "--":
+        cmd_args = cmd_args[1:]
+    if not cmd_args:
+        print("record requires a command to run", file=sys.stderr)
+        return 2
+
+    start = dt.datetime.now(dt.timezone.utc)
+    captured: list[str] = []
+    captured_lock = threading.Lock()
+
+    popen_cmd: list[str] | str = cmd_args
+    use_shell = False
+    if os.name == "nt":
+        popen_cmd = subprocess.list2cmdline(cmd_args)
+        use_shell = True
+
+    proc = subprocess.Popen(
+        popen_cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        bufsize=1,
+        shell=use_shell,
+    )
+
+    def stream_output(stream, terminal) -> None:
+        try:
+            for line in iter(stream.readline, ""):
+                terminal.write(line)
+                terminal.flush()
+                with captured_lock:
+                    captured.append(line)
+        finally:
+            stream.close()
+
+    threads = [
+        threading.Thread(target=stream_output, args=(proc.stdout, sys.stdout), daemon=True),
+        threading.Thread(target=stream_output, args=(proc.stderr, sys.stderr), daemon=True),
+    ]
+    for thread in threads:
+        thread.start()
+
+    exit_code = proc.wait()
+    for thread in threads:
+        thread.join()
+
+    end = dt.datetime.now(dt.timezone.utc)
+    duration_seconds = (end - start).total_seconds()
+    raw_output = "".join(captured)
+    sanitized_output = sanitize(raw_output)
+    run_id = f"{start.strftime('%Y%m%dT%H%M%S')}_{uuid.uuid4().hex[:8]}"
+    out_dir = Path(args.out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out_path = out_dir / f"run_{run_id}.json"
+
+    record = {
+        "id": run_id,
+        "name": args.name or " ".join(cmd_args),
+        "command": cmd_args,
+        "start_time": start.isoformat(),
+        "end_time": end.isoformat(),
+        "duration_seconds": duration_seconds,
+        "exit_code": exit_code,
+        "raw_output": raw_output,
+        "sanitized_output": sanitized_output,
+    }
+    out_path.write_text(json.dumps(record, indent=2), encoding="utf-8")
+
+    print(f"[FLIGHT RECORDER] Command finished with exit code {exit_code} in {duration_seconds:.2f}s.")
+    print(f"[FLIGHT RECORDER] Recording saved to: {out_path}")
+    return exit_code
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Local-first flight recorder for AI coding agents")
     parser.add_argument("--hermes-home", default=str(DEFAULT_HERMES_HOME))
@@ -540,6 +621,12 @@ def build_parser() -> argparse.ArgumentParser:
     export_cron.add_argument("job", help="Cron job id or name substring")
     export_cron.add_argument("--out", required=True)
     export_cron.set_defaults(func=cmd_export_cron)
+
+    record = sub.add_parser("record", help="Run a command and save a flight recording")
+    record.add_argument("--name", default=None, help="Human-friendly name for this run")
+    record.add_argument("--out-dir", default="runs", help="Directory to store recordings")
+    record.add_argument("cmd_args", nargs=argparse.REMAINDER, help="Command and arguments to run")
+    record.set_defaults(func=cmd_record)
     return parser
 
 

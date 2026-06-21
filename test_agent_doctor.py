@@ -1,8 +1,9 @@
 import datetime as dt
 import json
+import sys
 from pathlib import Path
 
-from agent_doctor import build_parser, cmd_demo, correlate_inbound_flushes, diagnose_cron_job, diagnose_no_response, find_cron_job, parse_log_line, sanitize
+from agent_doctor import build_parser, cmd_demo, cmd_record, correlate_inbound_flushes, diagnose_cron_job, diagnose_no_response, find_cron_job, parse_log_line, sanitize
 
 
 def test_parse_discord_connected():
@@ -129,3 +130,35 @@ def test_demo_runs_full_pipeline_and_writes_report(tmp_path):
     assert "Unrelated platform reconnect noise" in report
     assert "demo-secret-value" not in report
     assert "[REDACTED_SECRET]" in report
+
+
+def test_cmd_record(tmp_path):
+    args = build_parser().parse_args(
+        [
+            "record",
+            "--name",
+            "test recording",
+            "--out-dir",
+            str(tmp_path),
+            "--",
+            sys.executable,
+            "-c",
+            "print('hello world'); print('token=supersecret')",
+        ]
+    )
+
+    assert cmd_record(args) == 0
+    records = list(tmp_path.glob("run_*.json"))
+    assert len(records) == 1
+
+    data = json.loads(records[0].read_text(encoding="utf-8"))
+    assert data["id"]
+    assert data["name"] == "test recording"
+    assert data["command"] == [sys.executable, "-c", "print('hello world'); print('token=supersecret')"]
+    assert data["exit_code"] == 0
+    assert data["duration_seconds"] >= 0
+    assert dt.datetime.fromisoformat(data["start_time"]) <= dt.datetime.fromisoformat(data["end_time"])
+    assert "hello world" in data["raw_output"]
+    assert "token=supersecret" in data["raw_output"]
+    assert "supersecret" not in data["sanitized_output"]
+    assert "[REDACTED_SECRET]" in data["sanitized_output"]
