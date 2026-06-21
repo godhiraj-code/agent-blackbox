@@ -9,3 +9,12 @@ exports/*.md
 *.sqlite
 *.sqlite3
 *.log
+
+# Build and egg-info
+*.egg-info/
+build/
+dist/
+.venv/
+runs/
+uv.lock
+
