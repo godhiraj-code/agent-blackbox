@@ -162,3 +162,37 @@ def test_cmd_record(tmp_path):
     assert "token=supersecret" in data["raw_output"]
     assert "supersecret" not in data["sanitized_output"]
     assert "[REDACTED_SECRET]" in data["sanitized_output"]
+
+
+def test_claude_parser(tmp_path):
+    import json
+    claude_dir = tmp_path / "claude"
+    projects_dir = claude_dir / "projects"
+    p_dir = projects_dir / "my-awesome-project"
+    p_dir.mkdir(parents=True)
+    
+    # Write a mock session JSONL
+    session_file = p_dir / "session-12345.jsonl"
+    lines = [
+        {"timestamp": "2026-03-20T10:00:00Z", "role": "user", "content": "hello agent"},
+        {"timestamp": "2026-03-20T10:00:05Z", "role": "assistant", "content": [{"type": "text", "text": "let me find files"}, {"type": "tool_use", "name": "search_files", "input": {"pattern": "*"}}]},
+        {"timestamp": "2026-03-20T10:00:10Z", "type": "tool_result", "content": "found 1 file"},
+        {"timestamp": "2026-03-20T10:00:15Z", "role": "assistant", "content": [{"type": "text", "text": "done"}]}
+    ]
+    with session_file.open("w", encoding="utf-8") as f:
+        for item in lines:
+            f.write(json.dumps(item) + "\n")
+            
+    from agent_blackbox.claude import find_claude_projects, summarize_claude_session
+    projects = find_claude_projects(claude_dir)
+    assert "my-awesome-project" in projects
+    assert session_file in projects["my-awesome-project"]
+    
+    summary = summarize_claude_session(session_file)
+    assert summary["session_id"] == "12345"
+    assert summary["user_prompts"] == 1
+    assert summary["assistant_turns"] == 2
+    assert summary["tool_calls"] == 1
+    assert "search_files" in summary["tools_used"]
+    assert summary["duration_seconds"] == 15
+

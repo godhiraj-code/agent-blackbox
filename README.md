@@ -1,23 +1,24 @@
 # Agent Blackbox
 
-Local-first flight recorder for AI coding agents.
+Local-first incident postmortem debugger for AI coding agents.
 
 ## What it is
 
 Agent Blackbox helps developers answer:
 
-- Did my agent receive my message?
-- Why did it not respond?
-- What was it doing?
-- Which platform/tool failed?
-- What warnings were just unrelated noise?
-- Can I export a readable postmortem?
+- Why did this AI-agent run fail?
+- Did the agent ignore instructions, loop, or hallucinate success?
+- Which files, commands, tools, or platform events mattered?
+- Did it touch risky files or run risky commands?
+- What warnings were unrelated noise?
+- What should I change before running the agent again?
+- Can I export a sanitized postmortem without leaking secrets?
 
-The first MVP starts with Hermes gateway logs because we hit the pain ourselves. Later adapters will support Claude Code, Cursor, Codex, OpenCode, and other coding agents.
+The first MVP starts with Hermes gateway logs because we hit the pain ourselves. Later adapters should support Claude Code, Cursor, Codex, OpenCode, and other coding agents — but the product is **not** trying to be another generic trace viewer.
 
 ## Why this exists
 
-AI coding agents are powerful but opaque. Existing LLM observability platforms are mostly cloud/instrumentation-heavy. This project starts from the local developer workflow: logs, sessions, terminal commands, files, diffs, and incidents on your machine.
+AI coding agents are powerful but opaque. Existing LLM observability platforms are mostly cloud/instrumentation-heavy, and local trace viewers already exist. Agent Blackbox starts from the developer incident workflow: logs, sessions, terminal commands, file diffs, risky actions, failure classification, and shareable postmortems on your machine.
 
 ## Privacy posture
 

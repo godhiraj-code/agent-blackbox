@@ -244,6 +244,65 @@ def cmd_record(args: argparse.Namespace) -> int:
     return exit_code
 
 
+def cmd_claude(args: argparse.Namespace) -> int:
+    from .claude import find_claude_projects, summarize_claude_session, DEFAULT_CLAUDE_DIR
+    claude_dir = Path(args.claude_dir) if args.claude_dir else DEFAULT_CLAUDE_DIR
+    projects = find_claude_projects(claude_dir)
+    
+    if not projects:
+        print(f"No Claude Code projects or transcripts found under {claude_dir}.")
+        return 0
+        
+    if args.session:
+        # User specified a specific session file or session id
+        target_path = None
+        for proj_name, sessions in projects.items():
+            for p in sessions:
+                if p.stem == args.session or p.name == args.session or str(p) == args.session:
+                    target_path = p
+                    break
+            if target_path:
+                break
+        
+        if not target_path:
+            p_direct = Path(args.session)
+            if p_direct.exists():
+                target_path = p_direct
+                
+        if not target_path:
+            print(f"Could not locate session transcript matching: {args.session}")
+            return 1
+            
+        summary = summarize_claude_session(target_path)
+        if "error" in summary:
+            print(f"Error: {summary['error']}")
+            return 1
+            
+        print(f"Claude Code Session: {summary['session_id']}")
+        print(f"Path: {summary['path']}")
+        print(f"Last Modified: {summary['last_modified']}")
+        print(f"Duration: {summary['duration_seconds']}s ({summary['start_time']} to {summary['end_time']})")
+        print(f"User Prompts: {summary['user_prompts']}")
+        print(f"Assistant Turns: {summary['assistant_turns']}")
+        print(f"Tool Calls: {summary['tool_calls']}")
+        print(f"Tools Used: {', '.join(summary['tools_used']) if summary['tools_used'] else 'none'}")
+        print(f"Errors: {summary['errors_count']}")
+        print(f"Status: {summary['status']}")
+        return 0
+
+    print("Claude Code Projects & Sessions:")
+    print("=" * 60)
+    for proj_name, sessions in projects.items():
+        print(f"\nProject: {proj_name}")
+        for p in sessions:
+            mtime = dt.datetime.fromtimestamp(p.stat().st_mtime).strftime("%Y-%m-%d %H:%M:%S")
+            sz_bytes = p.stat().st_size
+            print(f"  - {p.name:<40} {mtime} ({sz_bytes} bytes)")
+    print("\nTo inspect a specific session, run:")
+    print("  agent-doctor claude --session <session-id-or-filename>")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Local-first flight recorder for AI coding agents")
     parser.add_argument("--hermes-home", default=str(DEFAULT_HERMES_HOME))
@@ -293,6 +352,12 @@ def build_parser() -> argparse.ArgumentParser:
     rec.add_argument("--out-dir", default="runs", help="Directory to store recordings")
     rec.add_argument("cmd_args", nargs=argparse.REMAINDER, help="Command and arguments to run")
     rec.set_defaults(func=cmd_record)
+
+    cl = sub.add_parser("claude", help="Analyze and summarize local Claude Code sessions")
+    cl.add_argument("--session", default=None, help="Specific session ID, filename or absolute path to parse")
+    cl.add_argument("--claude-dir", default=None, help="Override default Claude Code configuration directory")
+    cl.set_defaults(func=cmd_claude)
+
     return parser
 
 
