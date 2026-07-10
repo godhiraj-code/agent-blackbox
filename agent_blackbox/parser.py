@@ -8,11 +8,32 @@ from dataclasses import dataclass
 from pathlib import Path
 
 DEFAULT_HERMES_HOME = Path.home() / "AppData" / "Local" / "hermes"
-DEFAULT_DEMO_LOG = Path(__file__).parent.parent / "examples" / "demo_gateway.txt"
+DEFAULT_DEMO_LOG = Path(__file__).parent / "data" / "demo_gateway.txt"
 SECRET_PATTERNS = [
-    re.compile(r"(?i)(api[_-]?key|token|secret|password|authorization)[:=]\s*[^\s,;]+"),
-    re.compile(r"(?i)bearer\s+[a-z0-9._\-]+"),
     re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----.*?-----END [A-Z ]*PRIVATE KEY-----", re.S),
+    re.compile(r"(?i)\bauthorization\s*[:=]\s*(?:bearer\s+)?[^\s,;]+"),
+    re.compile(r"(?i)\bbearer\s+[a-z0-9._\-~+/=]+"),
+    re.compile(
+        r"(?i)\b(api[_-]?key|token|secret|password|access[_-]?token|refresh[_-]?token|client[_-]?secret)"
+        r"\b\s*[:=]\s*[\"']?[^\"'\s,;]+[\"']?"
+    ),
+    re.compile(r"\b(?:sk|rk|pk)-[A-Za-z0-9_\-]{20,}\b"),
+    re.compile(r"\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9_]{20,}\b"),
+    re.compile(r"\bgithub_pat_[A-Za-z0-9_]{20,}\b"),
+    re.compile(r"\bxox[baprs]-[A-Za-z0-9\-]{20,}\b"),
+    re.compile(r"\b(?:AKIA|ASIA)[A-Z0-9]{16}\b"),
+    re.compile(r"\beyJ[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\b"),
+    re.compile(r"(?i)\bhttps?://[^\s/:@]+:[^\s/@]+@"),
+    re.compile(
+        r"(?i)(?:--(?:api[-_]?key|token|password|secret|access[-_]?token|client[-_]?secret))"
+        r"(?:=|\s+)[^\s]+"
+    ),
+    re.compile(
+        r"(?i)(?:[\"']?(?:api[_-]?key|token|secret|password|access[_-]?token|refresh[_-]?token|client[_-]?secret)[\"']?)"
+        r"\s*:\s*[\"'][^\"']*[\"']"
+    ),
+    re.compile(r"\bnpm_[A-Za-z0-9]{20,}\b"),
+    re.compile(r"\bAIza[0-9A-Za-z_\-]{30,}\b"),
 ]
 
 
@@ -126,5 +147,9 @@ def latest_cron_output(job_id: str, hermes_home: Path = DEFAULT_HERMES_HOME) -> 
     out_dir = cron_output_dir(job_id, hermes_home)
     if not out_dir.exists():
         return None
-    files = sorted(out_dir.glob("*.md"), key=lambda p: p.stat().st_mtime, reverse=True)
+    files = sorted(
+        (path for path in out_dir.glob("*.md") if path.is_file() and not path.is_symlink()),
+        key=lambda p: p.stat().st_mtime,
+        reverse=True,
+    )
     return files[0] if files else None

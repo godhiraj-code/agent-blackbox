@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from .version import __version__
+
 from .parser import (
     Event,
     parse_timestamp,
@@ -17,8 +19,19 @@ from .diagnosis import (
     diagnose_cron_job,
     cron_postmortem,
     diagnose_no_response,
+    diagnose_recorded_run,
+    diagnose_latest_recording,
     correlate_inbound_flushes,
     build_notes,
     postmortem,
+    recorded_run_postmortem,
 )
-from .cli import build_parser, cmd_demo, cmd_record, main
+from .blackbox import (
+    BlackboxEvent,
+    analyze_blackbox_events,
+    detect_risk_findings,
+    event_from_dict,
+    find_latest_recording,
+    load_blackbox_events,
+)
+from .cli import build_parser, cmd_demo, cmd_record, cmd_diagnose_run, cmd_run_doctor, cmd_analyze_events, cmd_opencode, main

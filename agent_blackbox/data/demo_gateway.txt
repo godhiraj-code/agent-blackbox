@@ -1,0 +1,5 @@
+2026-06-20 21:56:48,739 INFO hermes_plugins.discord_platform.adapter: [Discord] Connected as DemoAgent#0001
+2026-06-20 21:57:57,932 INFO gateway.run: inbound message: platform=discord user=demo-user chat=demo-chat msg='Why did the agent go quiet? token=demo-secret-value' reply_to_id=None reply_to_text=''
+2026-06-20 21:58:18,297 WARNING gateway.platforms.telegram_network: [Telegram] Primary api.telegram.org connection failed (); trying fallback IPs 149.154.166.110
+2026-06-20 21:58:31,412 INFO gateway.run: Agent cache invalidated for session agent:main:discord:dm:demo-chat: message_count changed (8 -> 10), possible cross-process write
+2026-06-20 21:58:44,032 INFO hermes_plugins.discord_platform.adapter: [Discord] Flushing text batch agent:main:discord:dm:demo-chat (88 chars)
