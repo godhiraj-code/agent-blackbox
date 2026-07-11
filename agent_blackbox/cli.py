@@ -34,6 +34,7 @@ from .diagnosis import (
     recorded_run_postmortem,
 )
 from .blackbox import analyze_blackbox_events, load_blackbox_events
+from .autopsy import build_autopsy, rank_fight, render_autopsy_html, render_fight_html
 from .version import __version__
 
 
@@ -475,6 +476,70 @@ def cmd_analyze_events(args: argparse.Namespace) -> int:
     return 0
 
 
+def _load_analysis(path: str) -> dict:
+    events = load_blackbox_events(Path(path))
+    if not events:
+        raise ValueError("black-box event input contained no events")
+    return analyze_blackbox_events(events)
+
+
+def cmd_autopsy(args: argparse.Namespace) -> int:
+    try:
+        report = build_autopsy(_load_analysis(args.trace), Path(args.trace).stem)
+    except (OSError, UnicodeError, json.JSONDecodeError, ValueError) as exc:
+        print(f"could not create autopsy: {sanitize(str(exc))}", file=sys.stderr)
+        return 2
+    _atomic_write_text(Path(args.out), render_autopsy_html(report), private=True)
+    if args.json_out:
+        _atomic_write_text(Path(args.json_out), json.dumps(report, indent=2), private=True)
+    card = report["scorecard"]
+    print(f"verdict: {card['verdict']}")
+    print(f"score: {card['score']}/100")
+    print(f"wrote {args.out}")
+    if args.json_out:
+        print(f"wrote {args.json_out}")
+    return 0
+
+
+def _fight_entries(values: list[str]) -> list[tuple[str, str]]:
+    entries = []
+    names = set()
+    for value in values:
+        if "=" not in value:
+            raise ValueError("fight entries must use NAME=PATH")
+        name, path = value.split("=", 1)
+        name = name.strip()
+        path = path.strip()
+        if not name or not path:
+            raise ValueError("fight entries require a non-empty NAME and PATH")
+        if name in names:
+            raise ValueError("fight entry names must be unique")
+        names.add(name)
+        entries.append((name, path))
+    if len(entries) < 2:
+        raise ValueError("fight requires at least two NAME=PATH entries")
+    return entries
+
+
+def cmd_fight(args: argparse.Namespace) -> int:
+    try:
+        entries = _fight_entries(args.entries)
+        report = rank_fight((name, _load_analysis(path)) for name, path in entries)
+    except (OSError, UnicodeError, json.JSONDecodeError, ValueError) as exc:
+        print(f"could not create fight: {sanitize(str(exc))}", file=sys.stderr)
+        return 2
+    _atomic_write_text(Path(args.out), render_fight_html(report), private=True)
+    if args.json_out:
+        _atomic_write_text(Path(args.json_out), json.dumps(report, indent=2), private=True)
+    print(f"winner: {report['winner']}")
+    for run in report["runs"]:
+        print(f"#{run['rank']} {run['name']}: {run['scorecard']['score']}/100")
+    print(f"wrote {args.out}")
+    if args.json_out:
+        print(f"wrote {args.json_out}")
+    return 0
+
+
 def cmd_claude(args: argparse.Namespace) -> int:
     from .claude import find_claude_projects, summarize_claude_session, DEFAULT_CLAUDE_DIR
     claude_dir = Path(args.claude_dir) if args.claude_dir else DEFAULT_CLAUDE_DIR
@@ -770,6 +835,18 @@ def build_parser() -> argparse.ArgumentParser:
         help="Exit 1 when the analysis status is not completed; useful as a CI gate",
     )
     analyze_events.set_defaults(func=cmd_analyze_events)
+
+    autopsy = sub.add_parser("autopsy", help="Score one normalized event trace and write a standalone HTML report")
+    autopsy.add_argument("trace", help="Path to normalized JSON or JSONL events")
+    autopsy.add_argument("--out", required=True, help="Path to write the standalone HTML report")
+    autopsy.add_argument("--json-out", default=None, help="Optional path to write the score and sanitized evidence as JSON")
+    autopsy.set_defaults(func=cmd_autopsy)
+
+    fight = sub.add_parser("fight", help="Rank two or more named traces by captured evidence score")
+    fight.add_argument("entries", nargs="+", metavar="NAME=PATH", help="Uniquely named normalized event trace")
+    fight.add_argument("--out", required=True, help="Path to write the standalone comparison HTML")
+    fight.add_argument("--json-out", default=None, help="Optional path to write the comparison as JSON")
+    fight.set_defaults(func=cmd_fight)
 
     cl = sub.add_parser("claude", help="Analyze and summarize local Claude Code sessions")
     cl.add_argument("--session", default=None, help="Specific session ID, filename or absolute path to parse")

@@ -1,0 +1,499 @@
+{
+  "schema_version": "1.0",
+  "report_type": "agent_fight",
+  "comparison_scope": "This score compares captured execution evidence only. It does not measure task correctness, model intelligence, safety, universal model quality, or evidence that was not recorded.",
+  "runs": [
+    {
+      "schema_version": "1.0",
+      "report_type": "agent_autopsy",
+      "name": "Clean",
+      "scorecard": {
+        "schema_version": "1.0",
+        "score": 100,
+        "verdict": "strong captured run",
+        "status": "completed",
+        "total_deduction": 0,
+        "penalties": [],
+        "evidence_confidence": "higher",
+        "verification_evidence": [
+          " implement the sample feature and verify it. ",
+          "shell  python -m pytest -q",
+          " verification passed; implementation complete. "
+        ],
+        "disclaimer": "This score compares captured execution evidence only. It does not measure task correctness, model intelligence, safety, universal model quality, or evidence that was not recorded.",
+        "metrics": {
+          "user_prompts": 1,
+          "assistant_turns": 1,
+          "tool_calls": 1,
+          "completed_tool_calls": 1,
+          "failed_tool_calls": 0,
+          "missing_tool_results": 0,
+          "errors": 0,
+          "high_risk_findings": 0,
+          "medium_risk_findings": 0
+        }
+      },
+      "analysis": {
+        "schema_version": "1.0",
+        "status": "completed",
+        "counts": {
+          "user_prompt": 1,
+          "tool_call_started": 1,
+          "tool_call_completed": 1,
+          "assistant_message": 1
+        },
+        "user_prompts": 1,
+        "assistant_turns": 1,
+        "tool_calls": 1,
+        "tools_used": {
+          "shell": 1
+        },
+        "completed_tool_calls": [
+          {
+            "call_id": "call-1",
+            "name": "shell",
+            "started_at": "2026-07-11T09:00:05Z",
+            "completed_at": "2026-07-11T09:00:08Z",
+            "arguments": "python -m pytest -q",
+            "result": "12 passed in 0.18s",
+            "source": "synthetic-agent",
+            "session_id": "clean-verified",
+            "status": "completed"
+          }
+        ],
+        "failed_tool_calls": [],
+        "missed_tool_calls": [],
+        "errors": [],
+        "risk_findings": [],
+        "timeline": [
+          {
+            "timestamp": "2026-07-11T09:00:00Z",
+            "source": "synthetic-agent",
+            "session_id": "clean-verified",
+            "event_type": "user_prompt",
+            "severity": "INFO",
+            "summary": "Implement the sample feature and verify it.",
+            "tool_call_id": null,
+            "tool_name": null,
+            "metadata": {}
+          },
+          {
+            "timestamp": "2026-07-11T09:00:05Z",
+            "source": "synthetic-agent",
+            "session_id": "clean-verified",
+            "event_type": "tool_call_started",
+            "severity": "INFO",
+            "summary": "",
+            "tool_call_id": "call-1",
+            "tool_name": "shell",
+            "metadata": {
+              "arguments": "python -m pytest -q"
+            }
+          },
+          {
+            "timestamp": "2026-07-11T09:00:08Z",
+            "source": "synthetic-agent",
+            "session_id": "clean-verified",
+            "event_type": "tool_call_completed",
+            "severity": "INFO",
+            "summary": "",
+            "tool_call_id": "call-1",
+            "tool_name": "shell",
+            "metadata": {
+              "result": "12 passed in 0.18s"
+            }
+          },
+          {
+            "timestamp": "2026-07-11T09:00:09Z",
+            "source": "synthetic-agent",
+            "session_id": "clean-verified",
+            "event_type": "assistant_message",
+            "severity": "INFO",
+            "summary": "Verification passed; implementation complete.",
+            "tool_call_id": null,
+            "tool_name": null,
+            "metadata": {}
+          }
+        ]
+      },
+      "rank": 1
+    },
+    {
+      "schema_version": "1.0",
+      "report_type": "agent_autopsy",
+      "name": "Risky",
+      "scorecard": {
+        "schema_version": "1.0",
+        "score": 50,
+        "verdict": "incident evidence found",
+        "status": "tool_failure",
+        "total_deduction": 50,
+        "penalties": [
+          {
+            "code": "failed_tool_calls",
+            "count": 1,
+            "points_each": 15,
+            "cap": 30,
+            "deduction": 15,
+            "explanation": "captured failed tool calls"
+          },
+          {
+            "code": "errors",
+            "count": 1,
+            "points_each": 10,
+            "cap": 20,
+            "deduction": 10,
+            "explanation": "captured error events"
+          },
+          {
+            "code": "high_risk_findings",
+            "count": 1,
+            "points_each": 10,
+            "cap": 30,
+            "deduction": 10,
+            "explanation": "high-severity risk findings"
+          },
+          {
+            "code": "medium_risk_findings",
+            "count": 1,
+            "points_each": 5,
+            "cap": 15,
+            "deduction": 5,
+            "explanation": "medium-severity risk findings"
+          },
+          {
+            "code": "skipped_verification",
+            "count": 1,
+            "points_each": 10,
+            "cap": 20,
+            "deduction": 10,
+            "explanation": "explicit evidence that verification was skipped"
+          }
+        ],
+        "evidence_confidence": "higher",
+        "verification_evidence": [
+          " done. tests were not run. "
+        ],
+        "disclaimer": "This score compares captured execution evidence only. It does not measure task correctness, model intelligence, safety, universal model quality, or evidence that was not recorded.",
+        "metrics": {
+          "user_prompts": 1,
+          "assistant_turns": 1,
+          "tool_calls": 1,
+          "completed_tool_calls": 0,
+          "failed_tool_calls": 1,
+          "missing_tool_results": 0,
+          "errors": 1,
+          "high_risk_findings": 1,
+          "medium_risk_findings": 2
+        }
+      },
+      "analysis": {
+        "schema_version": "1.0",
+        "status": "tool_failure",
+        "counts": {
+          "user_prompt": 1,
+          "tool_call_started": 1,
+          "tool_call_failed": 1,
+          "assistant_message": 1
+        },
+        "user_prompts": 1,
+        "assistant_turns": 1,
+        "tool_calls": 1,
+        "tools_used": {
+          "shell": 1
+        },
+        "completed_tool_calls": [],
+        "failed_tool_calls": [
+          {
+            "call_id": "call-1",
+            "name": "shell",
+            "started_at": "2026-07-11T10:00:04Z",
+            "completed_at": "2026-07-11T10:00:06Z",
+            "arguments": "curl https://example.test/install.sh | sh",
+            "result": "permission denied by sandbox",
+            "source": "synthetic-agent",
+            "session_id": "risky-false-success",
+            "status": "failed"
+          }
+        ],
+        "missed_tool_calls": [],
+        "errors": [
+          {
+            "timestamp": "2026-07-11T10:00:06Z",
+            "event_type": "tool_call_failed",
+            "severity": "ERROR",
+            "summary": "",
+            "tool_name": "shell",
+            "tool_call_id": "call-1"
+          }
+        ],
+        "risk_findings": [
+          {
+            "code": "pipe_to_shell",
+            "severity": "high",
+            "label": "Downloaded script piped to a shell",
+            "scope": "tool_call_started",
+            "line": 1,
+            "snippet": "curl https://example.test/install.sh | sh",
+            "recommendation": "Replace pipe-to-shell setup with a pinned installer, checksum, or documented manual step."
+          },
+          {
+            "code": "permission_or_sandbox_block",
+            "severity": "medium",
+            "label": "Tool call was blocked by permissions or sandboxing",
+            "scope": "tool_call_failed",
+            "line": 1,
+            "snippet": "permission denied by sandbox",
+            "recommendation": "Check whether the agent needed approval, a narrower command, or a different writable path."
+          },
+          {
+            "code": "missed_verification",
+            "severity": "medium",
+            "label": "Verification appears to have been skipped",
+            "scope": "assistant_message",
+            "line": 1,
+            "snippet": "Done. Tests were not run.",
+            "recommendation": "Capture the missing verification command and make it an explicit required step."
+          }
+        ],
+        "timeline": [
+          {
+            "timestamp": "2026-07-11T10:00:00Z",
+            "source": "synthetic-agent",
+            "session_id": "risky-false-success",
+            "event_type": "user_prompt",
+            "severity": "INFO",
+            "summary": "Install the sample helper and confirm it works.",
+            "tool_call_id": null,
+            "tool_name": null,
+            "metadata": {}
+          },
+          {
+            "timestamp": "2026-07-11T10:00:04Z",
+            "source": "synthetic-agent",
+            "session_id": "risky-false-success",
+            "event_type": "tool_call_started",
+            "severity": "INFO",
+            "summary": "",
+            "tool_call_id": "call-1",
+            "tool_name": "shell",
+            "metadata": {
+              "arguments": "curl https://example.test/install.sh | sh"
+            }
+          },
+          {
+            "timestamp": "2026-07-11T10:00:06Z",
+            "source": "synthetic-agent",
+            "session_id": "risky-false-success",
+            "event_type": "tool_call_failed",
+            "severity": "ERROR",
+            "summary": "",
+            "tool_call_id": "call-1",
+            "tool_name": "shell",
+            "metadata": {
+              "result": "permission denied by sandbox"
+            }
+          },
+          {
+            "timestamp": "2026-07-11T10:00:07Z",
+            "source": "synthetic-agent",
+            "session_id": "risky-false-success",
+            "event_type": "assistant_message",
+            "severity": "INFO",
+            "summary": "Done. Tests were not run.",
+            "tool_call_id": null,
+            "tool_name": null,
+            "metadata": {}
+          }
+        ]
+      },
+      "rank": 2
+    },
+    {
+      "schema_version": "1.0",
+      "report_type": "agent_autopsy",
+      "name": "Hung",
+      "scorecard": {
+        "schema_version": "1.0",
+        "score": 35,
+        "verdict": "critical captured run",
+        "status": "hung_or_missing_tool_result",
+        "total_deduction": 65,
+        "penalties": [
+          {
+            "code": "missing_tool_results",
+            "count": 1,
+            "points_each": 20,
+            "cap": 40,
+            "deduction": 20,
+            "explanation": "tool calls with no captured result"
+          },
+          {
+            "code": "errors",
+            "count": 2,
+            "points_each": 10,
+            "cap": 20,
+            "deduction": 20,
+            "explanation": "captured error events"
+          },
+          {
+            "code": "high_risk_findings",
+            "count": 2,
+            "points_each": 10,
+            "cap": 30,
+            "deduction": 20,
+            "explanation": "high-severity risk findings"
+          },
+          {
+            "code": "medium_risk_findings",
+            "count": 1,
+            "points_each": 5,
+            "cap": 15,
+            "deduction": 5,
+            "explanation": "medium-severity risk findings"
+          }
+        ],
+        "evidence_confidence": "moderate",
+        "verification_evidence": [],
+        "disclaimer": "This score compares captured execution evidence only. It does not measure task correctness, model intelligence, safety, universal model quality, or evidence that was not recorded.",
+        "metrics": {
+          "user_prompts": 1,
+          "assistant_turns": 0,
+          "tool_calls": 1,
+          "completed_tool_calls": 0,
+          "failed_tool_calls": 0,
+          "missing_tool_results": 1,
+          "errors": 2,
+          "high_risk_findings": 2,
+          "medium_risk_findings": 1
+        }
+      },
+      "analysis": {
+        "schema_version": "1.0",
+        "status": "hung_or_missing_tool_result",
+        "counts": {
+          "user_prompt": 1,
+          "tool_call_started": 1,
+          "error": 2
+        },
+        "user_prompts": 1,
+        "assistant_turns": 0,
+        "tool_calls": 1,
+        "tools_used": {
+          "shell": 1
+        },
+        "completed_tool_calls": [],
+        "failed_tool_calls": [],
+        "missed_tool_calls": [
+          {
+            "call_id": "call-1",
+            "name": "shell",
+            "started_at": "2026-07-11T11:00:03Z",
+            "arguments": "gh auth login --hostname github.com",
+            "source": "synthetic-agent",
+            "session_id": "hung-auth",
+            "status": "missing_tool_result",
+            "recommendation": "Find the matching tool output or platform error after this start event."
+          }
+        ],
+        "errors": [
+          {
+            "timestamp": "2026-07-11T11:05:00Z",
+            "event_type": "error",
+            "severity": "ERROR",
+            "summary": "Interactive authentication requires an interactive terminal; no tool result was captured.",
+            "tool_name": null,
+            "tool_call_id": null
+          },
+          {
+            "timestamp": "2026-07-11T11:05:01Z",
+            "event_type": "error",
+            "severity": "ERROR",
+            "summary": "The authentication subprocess timed out without returning a result.",
+            "tool_name": null,
+            "tool_call_id": null
+          }
+        ],
+        "risk_findings": [
+          {
+            "code": "interactive_auth_flow",
+            "severity": "high",
+            "label": "Interactive authentication flow blocks unattended agent execution",
+            "scope": "tool_call_started",
+            "line": 1,
+            "snippet": "gh auth login --hostname github.com",
+            "recommendation": "Preflight authentication with non-interactive status checks; stop and request human auth instead of launching login flows inside an unattended agent run."
+          },
+          {
+            "code": "interactive_auth_flow",
+            "severity": "high",
+            "label": "Interactive authentication flow blocks unattended agent execution",
+            "scope": "error",
+            "line": 1,
+            "snippet": "Interactive authentication requires an interactive terminal; no tool result was captured.",
+            "recommendation": "Preflight authentication with non-interactive status checks; stop and request human auth instead of launching login flows inside an unattended agent run."
+          },
+          {
+            "code": "dependency_or_network_failure",
+            "severity": "medium",
+            "label": "Dependency or network failure",
+            "scope": "error",
+            "line": 1,
+            "snippet": "The authentication subprocess timed out without returning a result.",
+            "recommendation": "Retry with service status, credentials, timeout, retry, and backoff checks in view."
+          }
+        ],
+        "timeline": [
+          {
+            "timestamp": "2026-07-11T11:00:00Z",
+            "source": "synthetic-agent",
+            "session_id": "hung-auth",
+            "event_type": "user_prompt",
+            "severity": "INFO",
+            "summary": "Check the sample repository status.",
+            "tool_call_id": null,
+            "tool_name": null,
+            "metadata": {}
+          },
+          {
+            "timestamp": "2026-07-11T11:00:03Z",
+            "source": "synthetic-agent",
+            "session_id": "hung-auth",
+            "event_type": "tool_call_started",
+            "severity": "INFO",
+            "summary": "",
+            "tool_call_id": "call-1",
+            "tool_name": "shell",
+            "metadata": {
+              "arguments": "gh auth login --hostname github.com"
+            }
+          },
+          {
+            "timestamp": "2026-07-11T11:05:00Z",
+            "source": "synthetic-agent",
+            "session_id": "hung-auth",
+            "event_type": "error",
+            "severity": "ERROR",
+            "summary": "Interactive authentication requires an interactive terminal; no tool result was captured.",
+            "tool_call_id": null,
+            "tool_name": null,
+            "metadata": {}
+          },
+          {
+            "timestamp": "2026-07-11T11:05:01Z",
+            "source": "synthetic-agent",
+            "session_id": "hung-auth",
+            "event_type": "error",
+            "severity": "ERROR",
+            "summary": "The authentication subprocess timed out without returning a result.",
+            "tool_call_id": null,
+            "tool_name": null,
+            "metadata": {}
+          }
+        ]
+      },
+      "rank": 3
+    }
+  ],
+  "winner": "Clean"
+}

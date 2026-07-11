@@ -11,6 +11,8 @@ from agent_blackbox.cli import (
     cmd_diagnose_run,
     cmd_run_doctor,
     cmd_analyze_events,
+    cmd_autopsy,
+    cmd_fight,
     cmd_export_html,
     cmd_claude,
     cmd_codex,
@@ -34,6 +36,7 @@ from agent_blackbox.blackbox import (
     find_latest_recording,
     load_blackbox_events,
 )
+from agent_blackbox.autopsy import build_autopsy, rank_fight, render_autopsy_html, render_fight_html, score_analysis
 
 if __name__ == "__main__":
     raise SystemExit(main())

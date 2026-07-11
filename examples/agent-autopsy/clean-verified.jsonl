@@ -1,0 +1,4 @@
+{"timestamp":"2026-07-11T09:00:00Z","source":"synthetic-agent","session_id":"clean-verified","event_type":"user_prompt","summary":"Implement the sample feature and verify it."}
+{"timestamp":"2026-07-11T09:00:05Z","source":"synthetic-agent","session_id":"clean-verified","event_type":"tool_call_started","tool_call_id":"call-1","tool_name":"shell","arguments":"python -m pytest -q"}
+{"timestamp":"2026-07-11T09:00:08Z","source":"synthetic-agent","session_id":"clean-verified","event_type":"tool_call_completed","tool_call_id":"call-1","tool_name":"shell","result":"12 passed in 0.18s"}
+{"timestamp":"2026-07-11T09:00:09Z","source":"synthetic-agent","session_id":"clean-verified","event_type":"assistant_message","summary":"Verification passed; implementation complete."}

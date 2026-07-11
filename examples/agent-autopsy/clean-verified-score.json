@@ -1,0 +1,114 @@
+{
+  "schema_version": "1.0",
+  "report_type": "agent_autopsy",
+  "name": "clean-verified",
+  "scorecard": {
+    "schema_version": "1.0",
+    "score": 100,
+    "verdict": "strong captured run",
+    "status": "completed",
+    "total_deduction": 0,
+    "penalties": [],
+    "evidence_confidence": "higher",
+    "verification_evidence": [
+      " implement the sample feature and verify it. ",
+      "shell  python -m pytest -q",
+      " verification passed; implementation complete. "
+    ],
+    "disclaimer": "This score compares captured execution evidence only. It does not measure task correctness, model intelligence, safety, universal model quality, or evidence that was not recorded.",
+    "metrics": {
+      "user_prompts": 1,
+      "assistant_turns": 1,
+      "tool_calls": 1,
+      "completed_tool_calls": 1,
+      "failed_tool_calls": 0,
+      "missing_tool_results": 0,
+      "errors": 0,
+      "high_risk_findings": 0,
+      "medium_risk_findings": 0
+    }
+  },
+  "analysis": {
+    "schema_version": "1.0",
+    "status": "completed",
+    "counts": {
+      "user_prompt": 1,
+      "tool_call_started": 1,
+      "tool_call_completed": 1,
+      "assistant_message": 1
+    },
+    "user_prompts": 1,
+    "assistant_turns": 1,
+    "tool_calls": 1,
+    "tools_used": {
+      "shell": 1
+    },
+    "completed_tool_calls": [
+      {
+        "call_id": "call-1",
+        "name": "shell",
+        "started_at": "2026-07-11T09:00:05Z",
+        "completed_at": "2026-07-11T09:00:08Z",
+        "arguments": "python -m pytest -q",
+        "result": "12 passed in 0.18s",
+        "source": "synthetic-agent",
+        "session_id": "clean-verified",
+        "status": "completed"
+      }
+    ],
+    "failed_tool_calls": [],
+    "missed_tool_calls": [],
+    "errors": [],
+    "risk_findings": [],
+    "timeline": [
+      {
+        "timestamp": "2026-07-11T09:00:00Z",
+        "source": "synthetic-agent",
+        "session_id": "clean-verified",
+        "event_type": "user_prompt",
+        "severity": "INFO",
+        "summary": "Implement the sample feature and verify it.",
+        "tool_call_id": null,
+        "tool_name": null,
+        "metadata": {}
+      },
+      {
+        "timestamp": "2026-07-11T09:00:05Z",
+        "source": "synthetic-agent",
+        "session_id": "clean-verified",
+        "event_type": "tool_call_started",
+        "severity": "INFO",
+        "summary": "",
+        "tool_call_id": "call-1",
+        "tool_name": "shell",
+        "metadata": {
+          "arguments": "python -m pytest -q"
+        }
+      },
+      {
+        "timestamp": "2026-07-11T09:00:08Z",
+        "source": "synthetic-agent",
+        "session_id": "clean-verified",
+        "event_type": "tool_call_completed",
+        "severity": "INFO",
+        "summary": "",
+        "tool_call_id": "call-1",
+        "tool_name": "shell",
+        "metadata": {
+          "result": "12 passed in 0.18s"
+        }
+      },
+      {
+        "timestamp": "2026-07-11T09:00:09Z",
+        "source": "synthetic-agent",
+        "session_id": "clean-verified",
+        "event_type": "assistant_message",
+        "severity": "INFO",
+        "summary": "Verification passed; implementation complete.",
+        "tool_call_id": null,
+        "tool_name": null,
+        "metadata": {}
+      }
+    ]
+  }
+}

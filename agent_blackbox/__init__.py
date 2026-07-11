@@ -34,4 +34,5 @@ from .blackbox import (
     find_latest_recording,
     load_blackbox_events,
 )
-from .cli import build_parser, cmd_demo, cmd_record, cmd_diagnose_run, cmd_run_doctor, cmd_analyze_events, cmd_opencode, main
+from .autopsy import build_autopsy, rank_fight, render_autopsy_html, render_fight_html, score_analysis
+from .cli import build_parser, cmd_demo, cmd_record, cmd_diagnose_run, cmd_run_doctor, cmd_analyze_events, cmd_autopsy, cmd_fight, cmd_opencode, main

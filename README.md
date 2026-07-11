@@ -1,12 +1,19 @@
-# Agent Blackbox
+# Agent Autopsy by Agent Blackbox
 
 [![CI](https://github.com/godhiraj-code/agent-blackbox/actions/workflows/ci.yml/badge.svg)](https://github.com/godhiraj-code/agent-blackbox/actions/workflows/ci.yml)
 
-**Know what your AI agents actually did.**
+**Score what an AI agent actually did, then put captured runs head-to-head.**
 
-Agent Blackbox is a local-first flight recorder and CI diagnostic gate for AI agent runs. It captures commands, reconstructs tool calls, diagnoses failures, and creates sanitized postmortems without uploading private traces.
+Agent Autopsy turns normalized local traces into standalone, sanitized HTML evidence reports. It gives one run a deterministic 0–100 score with every deduction exposed, while Agent Fight ranks two or more runs using the same captured-evidence contract. No cloud, telemetry, model call, or external report assets are required.
 
-> Trust the diagnosis, not a black-box success message.
+```bash
+agent-blackbox autopsy examples/agent-autopsy/clean-verified.jsonl --out autopsy.html --json-out score.json
+agent-blackbox fight Clean=examples/agent-autopsy/clean-verified.jsonl Risky=examples/agent-autopsy/risky-false-success.jsonl Hung=examples/agent-autopsy/hung-authentication.jsonl --out fight.html --json-out fight.json
+```
+
+> Scores describe captured execution evidence, not task correctness, safety, or universal model quality.
+
+Agent Blackbox remains a local-first flight recorder and CI diagnostic gate for AI agent runs. It captures commands, reconstructs tool calls, diagnoses failures, and creates sanitized postmortems without uploading private traces.
 
 ## What it is
 
@@ -69,6 +76,8 @@ agent-blackbox record --name "blackbox smoke" --out-dir runs -- python -c "print
 agent-blackbox diagnose-run runs/run_<id>.json --out exports/run-postmortem.md
 agent-blackbox analyze-events path/to/events.jsonl --out exports/events-analysis.json
 agent-blackbox analyze-events path/to/events.jsonl --format json --fail-on-incident
+agent-blackbox autopsy path/to/events.jsonl --out exports/autopsy.html --json-out exports/autopsy.json
+agent-blackbox fight Baseline=path/to/baseline.jsonl Candidate=path/to/candidate.jsonl --out exports/fight.html --json-out exports/fight.json
 agent-blackbox claude --session <session-id-or-filename>
 agent-blackbox codex --session <session-id-or-filename>
 agent-blackbox opencode --session <session-id-or-export-json>
@@ -160,7 +169,7 @@ Agent Blackbox is designed to fail closed:
 - recordings and reports are bounded and written atomically
 - machine-readable analysis can gate CI with nonzero exit codes
 
-The current suite has **46 passing regression tests**. Wheel, sdist, fresh-install, packaged-demo, privacy-default recording, and artifact-content smoke checks pass locally. Cross-platform CI is defined for Windows, macOS, and Linux; treat platform support as verified only for release commits whose matrix is green.
+The regression suite covers parsing, recording, normalized analysis, Agent Autopsy scoring/reporting, and Agent Fight ranking. Wheel, sdist, fresh-install, packaged-demo, privacy-default recording, and artifact-content smoke checks are release gates. Cross-platform CI is defined for Windows, macOS, and Linux; treat platform support as verified only for release commits whose matrix is green.
 
 ## Current status
 

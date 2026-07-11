@@ -4,6 +4,13 @@ All notable changes to Agent Blackbox are documented here. The format follows Ke
 
 ## [Unreleased]
 
+### Added
+
+- Added deterministic, explainable 0–100 Agent Autopsy scoring for normalized traces.
+- Added standalone escaped HTML and optional JSON output through `autopsy`.
+- Added deterministic multi-run captured-evidence ranking through `fight`.
+- Added three synthetic Autopsy fixtures plus generated sample single-run and comparison reports.
+
 ### Security
 
 - Sanitized command arguments, persisted output, and console output are now the default.
