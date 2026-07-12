@@ -28,7 +28,14 @@ Invoke-RestMethod http://127.0.0.1:8765/api/trace
 
 ## Record
 
-Capture a 1920×1080 browser window at 100% zoom, muted. Reload, begin recording, and press Space. Autoplay runs roughly 14 seconds of deliberately time-compressed evidence; pause on the diagnosis or use Arrow Right for presenter-paced stepping. Follow [VIDEO_SCRIPT.md](VIDEO_SCRIPT.md) for the 60–75 second edit. Keep the real `/api/state` proof visible in the browser/devtools cutaway.
+For a deterministic headless Chrome capture (requires Playwright and installed Chrome):
+
+```powershell
+python -I record_video.py
+ffmpeg -y -i artifacts/sol-self-autopsy.webm -vf "setpts=2.0*PTS" -r 25 -c:v libx264 -crf 18 -pix_fmt yuv420p -movflags +faststart -an artifacts/sol-self-autopsy-x.mp4
+```
+
+The checked capture is 1920×1080 H.264 and approximately 27 seconds. For a narrated 60–75 second cut, capture a 1920×1080 browser window at 100% zoom and use step mode to hold each forensic beat. Follow [VIDEO_SCRIPT.md](VIDEO_SCRIPT.md). Keep the real `/api/state` proof visible in the browser/devtools cutaway.
 
 `sample-trace.jsonl` is a checked-in sanitized reference. `run-trace.jsonl` is the most recent executable verification/browser run.
 
