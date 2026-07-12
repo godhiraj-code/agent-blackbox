@@ -1,0 +1,17 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Agent Blackbox · Self Autopsy</title><link rel="stylesheet" href="style.css"></head>
+<body><main>
+ <header><div><span class="eyebrow">AGENT BLACKBOX / INCIDENT 409</span><h1>The Agent That Autopsies Itself</h1></div><div id="clock">00:00.0</div></header>
+ <section class="hero"><div><span class="live">● LIVE EXECUTION</span><h2 id="headline">One task. Two conflicting truths.</h2><p id="caption">The UI says saved. The backend says no.</p></div><button id="start">RUN AUTOPSY <kbd>Space</kbd></button></section>
+ <section class="grid">
+  <article><label>TASK</label><h3>Set production flag</h3><div class="flag"><span>checkout_guard</span><strong>OFF → ON</strong></div><div id="toast" class="toast">✓ Saved</div><p id="claim" class="claim">Agent waiting…</p></article>
+  <article class="truth"><label>BACKEND TRUTH · /api/state</label><div class="value"><span id="backend">OFF</span><small id="version">VERSION 7</small></div><p id="truthText">Authoritative state is unchanged.</p></article>
+  <article class="wide"><label>BLACKBOX EVIDENCE</label><div id="timeline" class="timeline"><p class="dim">Evidence will appear here in causal order.</p></div></article>
+  <article><label>SOL DIAGNOSIS</label><p id="diagnosis" class="diagnosis">Awaiting contradiction…</p><div id="wrong" class="wrong">Tempting diagnosis: network flake</div></article>
+  <article><label>SURGICAL PATCH</label><pre id="diff"><span>- showToast('Saved')</span>
+<b>+ if (!response.ok) handleConflict()</b>
+<b>+ refreshState(); retryOnce()</b>
+<b>+ verify('/api/state')</b></pre></article>
+ </section>
+ <footer><div class="metrics"><span>1 TASK</span><span id="tools">0 EVIDENCE</span><span id="caught">0 FALSE-SUCCESS</span><span id="patch">0 PATCH</span><span id="verified">REPLAY PENDING</span></div><div class="controls"><button id="restart">R Restart</button><button id="step">→ Step</button><button id="pause">P Pause</button></div></footer>
+ <div id="end" class="end"><span>INDEPENDENT VERIFICATION ✓</span><h2>Most coding demos end when the code runs.<br>This one starts when the agent fails.</h2><p>Built with GPT-5.6 Sol</p></div>
+</main><script src="app.js"></script></body></html>

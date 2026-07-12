@@ -1,0 +1,13 @@
+{"schema_version":"1.0","seq":1,"timestamp":"2026-07-13T12:00:01.000Z","event":"http_request","source":"sol-self-autopsy","message":"POST /api/config","data":{"requested_value":"on","supplied_version":6}}
+{"schema_version":"1.0","seq":2,"timestamp":"2026-07-13T12:00:02.000Z","event":"http_response","source":"sol-self-autopsy","message":"HTTP 409 stale version","data":{"status":409,"expected_version":7,"supplied_version":6}}
+{"schema_version":"1.0","seq":3,"timestamp":"2026-07-13T12:00:03.000Z","event":"backend_state_read","source":"sol-self-autopsy","message":"Independent state read","data":{"flag":"checkout_guard","value":"off","version":7}}
+{"schema_version":"1.0","seq":4,"timestamp":"2026-07-13T12:00:04.000Z","event":"ui_toast","source":"sol-self-autopsy","message":"Green Saved toast rendered","data":{"color":"green"}}
+{"schema_version":"1.0","seq":5,"timestamp":"2026-07-13T12:00:05.000Z","event":"agent_claim","source":"sol-self-autopsy","message":"Agent claimed success","data":{"claim":"completed"}}
+{"schema_version":"1.0","seq":6,"timestamp":"2026-07-13T12:00:06.000Z","event":"contradiction","source":"sol-self-autopsy","message":"Claim says on; backend remains off","data":{"claimed":"on","actual":"off"}}
+{"schema_version":"1.0","seq":7,"timestamp":"2026-07-13T12:00:07.000Z","event":"http_request","source":"sol-self-autopsy","message":"POST /api/config","data":{"requested_value":"on","supplied_version":6}}
+{"schema_version":"1.0","seq":8,"timestamp":"2026-07-13T12:00:08.000Z","event":"http_response","source":"sol-self-autopsy","message":"HTTP 409 stale version","data":{"status":409,"expected_version":7,"supplied_version":6}}
+{"schema_version":"1.0","seq":9,"timestamp":"2026-07-13T12:00:09.000Z","event":"backend_state_read","source":"sol-self-autopsy","message":"Independent state read","data":{"flag":"checkout_guard","value":"off","version":7}}
+{"schema_version":"1.0","seq":10,"timestamp":"2026-07-13T12:00:10.000Z","event":"http_request","source":"sol-self-autopsy","message":"POST /api/config","data":{"requested_value":"on","supplied_version":7}}
+{"schema_version":"1.0","seq":11,"timestamp":"2026-07-13T12:00:11.000Z","event":"http_response","source":"sol-self-autopsy","message":"HTTP 200 persisted","data":{"status":200,"flag":"checkout_guard","value":"on","version":8}}
+{"schema_version":"1.0","seq":12,"timestamp":"2026-07-13T12:00:12.000Z","event":"backend_state_read","source":"sol-self-autopsy","message":"Independent state read","data":{"flag":"checkout_guard","value":"on","version":8}}
+{"schema_version":"1.0","seq":13,"timestamp":"2026-07-13T12:00:13.000Z","event":"verification","source":"sol-self-autopsy","message":"Independent backend read matches requested value","data":{"verified":true,"value":"on"}}
