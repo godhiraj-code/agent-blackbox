@@ -69,6 +69,20 @@ def score_analysis(analysis: dict[str, Any]) -> dict[str, Any]:
     if verification and analysis.get("timeline"):
         confidence = "higher"
 
+    raw_recommendations = analysis.get("recommendations") if isinstance(analysis.get("recommendations"), list) else []
+    recommendations = [str(item) for item in raw_recommendations if item]
+    if not recommendations:
+        if missing:
+            recommendations.append("Resolve missing tool results before trusting the run.")
+        if failed:
+            recommendations.append("Reproduce the failed tool call and inspect its first error.")
+        if high:
+            recommendations.append("Review high-severity actions and narrow permissions before rerunning.")
+        if not recommendations:
+            recommendations.append("Confirm task correctness separately; this score covers captured evidence only.")
+
+    quality = analysis.get("quality") if isinstance(analysis.get("quality"), dict) else {}
+
     return {
         "schema_version": AUTOPSY_SCHEMA_VERSION,
         "score": score,
@@ -78,6 +92,7 @@ def score_analysis(analysis: dict[str, Any]) -> dict[str, Any]:
         "penalties": penalties,
         "evidence_confidence": confidence,
         "verification_evidence": verification,
+        "recommendations": list(dict.fromkeys(recommendations))[:6],
         "disclaimer": EVIDENCE_DISCLAIMER,
         "metrics": {
             "user_prompts": _integer(analysis.get("user_prompts")),
@@ -89,6 +104,7 @@ def score_analysis(analysis: dict[str, Any]) -> dict[str, Any]:
             "errors": errors,
             "high_risk_findings": high,
             "medium_risk_findings": medium + skipped,
+            "evidence_gaps": len(_list(quality.get("evidence_gaps"))),
         },
     }
 
@@ -130,6 +146,7 @@ def render_autopsy_html(report: dict[str, Any]) -> str:
     risks = _list(analysis.get("risk_findings"))
     tools = analysis.get("tools_used") if isinstance(analysis.get("tools_used"), dict) else {}
     timeline = _list(analysis.get("timeline"))
+    quality = analysis.get("quality") if isinstance(analysis.get("quality"), dict) else {}
 
     penalty_rows = "".join(
         f"<tr><td>{_e(item['code'])}</td><td>{item['count']}</td><td>-{item['deduction']}</td><td>{_e(item['explanation'])}</td></tr>"
@@ -149,6 +166,8 @@ def render_autopsy_html(report: dict[str, Any]) -> str:
         "</tr>"
         for item in timeline
     ) or '<tr><td colspan="4">No timeline events captured.</td></tr>'
+    recommendation_items = "".join(f"<li>{_e(item)}</li>" for item in scorecard.get("recommendations", [])) or "<li>No next steps generated.</li>"
+    gap_items = "".join(f"<li>{_e(item)}</li>" for item in quality.get("evidence_gaps", [])) or "<li>No evidence gaps recorded.</li>"
     metric_cards = "".join(
         f'<div class="card"><span>{_e(label.replace("_", " "))}</span><b>{value}</b></div>'
         for label, value in metrics.items()
@@ -161,6 +180,7 @@ def render_autopsy_html(report: dict[str, Any]) -> str:
 <h2>Captured metrics</h2><div class="grid">{metric_cards}</div>
 <h2>Explainable deductions</h2><table><thead><tr><th>Penalty</th><th>Count</th><th>Deduction</th><th>Why</th></tr></thead><tbody>{penalty_rows}</tbody></table>
 <div class="columns"><section><h2>Risk findings</h2><ul>{risk_items}</ul></section><section><h2>Tool usage</h2><ul>{tool_items}</ul></section></div>
+<div class="columns"><section><h2>Recommended next steps</h2><ul>{recommendation_items}</ul></section><section><h2>Evidence gaps</h2><ul>{gap_items}</ul></section></div>
 <h2>Sanitized timeline</h2><table><thead><tr><th>Time</th><th>Event</th><th>Tool</th><th>Summary</th></tr></thead><tbody>{timeline_rows}</tbody></table>
 """,
     )

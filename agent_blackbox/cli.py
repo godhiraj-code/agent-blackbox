@@ -35,6 +35,7 @@ from .diagnosis import (
 )
 from .blackbox import analyze_blackbox_events, load_blackbox_events
 from .autopsy import build_autopsy, rank_fight, render_autopsy_html, render_fight_html
+from .repo_preflight import load_manifest, run_repo_preflight
 from .version import __version__
 
 
@@ -64,14 +65,30 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     return 0 if status_code == 0 else 1
 
 
+def _read_gateway_events(args: argparse.Namespace) -> list[Event] | None:
+    path = log_path(Path(args.hermes_home))
+    if not path.exists():
+        print(f"gateway log not found: {path}", file=sys.stderr)
+        return None
+    try:
+        return read_events(args.minutes, Path(args.hermes_home))
+    except (OSError, ValueError) as exc:
+        print(f"could not read gateway log: {sanitize(str(exc))}", file=sys.stderr)
+        return None
+
+
 def cmd_gateway(args: argparse.Namespace) -> int:
-    events = read_events(args.minutes, Path(args.hermes_home))
+    events = _read_gateway_events(args)
+    if events is None:
+        return 2
     print_gateway(events, args.platform)
     return 0
 
 
 def cmd_why(args: argparse.Namespace) -> int:
-    events = read_events(args.minutes, Path(args.hermes_home))
+    events = _read_gateway_events(args)
+    if events is None:
+        return 2
     diagnosis = diagnose_no_response(events, args.platform)
     print(f"status: {diagnosis['status']}")
     print(f"connected_count: {diagnosis['connected_count']}")
@@ -86,31 +103,37 @@ def cmd_why(args: argparse.Namespace) -> int:
             print(f"  #{item['index']} {status}{latency} at {item['timestamp']}")
     for note in diagnosis["notes"]:
         print(f"note: {note}")
-    return 0
+    return _diagnosis_exit_code(diagnosis["status"], getattr(args, "always_zero", False))
 
 
 def cmd_export(args: argparse.Namespace) -> int:
-    events = read_events(args.minutes, Path(args.hermes_home))
+    events = _read_gateway_events(args)
+    if events is None:
+        return 2
     diagnosis = diagnose_no_response(events, args.platform)
     text = postmortem(events, diagnosis, args.platform)
     out = Path(args.out)
     _atomic_write_text(out, text, private=True)
     print(f"wrote {out}")
-    return 0
+    return _diagnosis_exit_code(diagnosis["status"], getattr(args, "always_zero", False))
 
 
 def cmd_export_html(args: argparse.Namespace) -> int:
-    events = read_events(args.minutes, Path(args.hermes_home))
+    events = _read_gateway_events(args)
+    if events is None:
+        return 2
     diagnosis = diagnose_no_response(events, args.platform)
     html_content = html_postmortem(events, diagnosis, args.platform)
     out = Path(args.out)
     _atomic_write_text(out, html_content, private=True)
     print(f"wrote {out}")
-    return 0
+    return _diagnosis_exit_code(diagnosis["status"], getattr(args, "always_zero", False))
 
 
 def cmd_search(args: argparse.Namespace) -> int:
-    events = read_events(args.minutes, Path(args.hermes_home))
+    events = _read_gateway_events(args)
+    if events is None:
+        return 2
     q = args.query.lower()
     for event in events:
         if q in event.message.lower():
@@ -154,7 +177,11 @@ def parse_log_line_internal(line: str) -> Event | None:
 
 
 def cmd_cron(args: argparse.Namespace) -> int:
-    job = find_cron_job(args.job, Path(args.hermes_home))
+    try:
+        job = find_cron_job(args.job, Path(args.hermes_home))
+    except (OSError, ValueError) as exc:
+        print(f"could not resolve cron job: {sanitize(str(exc))}", file=sys.stderr)
+        return 2
     if not job:
         print(f"No cron job found for {args.job!r}")
         return 2
@@ -171,11 +198,15 @@ def cmd_cron(args: argparse.Namespace) -> int:
         print(f"last_error: {diagnosis['last_error']}")
     for item in diagnosis["recommendations"]:
         print(f"recommendation: {item}")
-    return 0
+    return _diagnosis_exit_code(diagnosis["status"], getattr(args, "always_zero", False))
 
 
 def cmd_export_cron(args: argparse.Namespace) -> int:
-    job = find_cron_job(args.job, Path(args.hermes_home))
+    try:
+        job = find_cron_job(args.job, Path(args.hermes_home))
+    except (OSError, ValueError) as exc:
+        print(f"could not resolve cron job: {sanitize(str(exc))}", file=sys.stderr)
+        return 2
     if not job:
         print(f"No cron job found for {args.job!r}")
         return 2
@@ -183,7 +214,7 @@ def cmd_export_cron(args: argparse.Namespace) -> int:
     out = Path(args.out)
     _atomic_write_text(out, cron_postmortem(diagnosis), private=True)
     print(f"wrote {out}")
-    return 0
+    return _diagnosis_exit_code(diagnosis["status"], getattr(args, "always_zero", False))
 
 
 def cmd_record(args: argparse.Namespace) -> int:
@@ -498,6 +529,8 @@ def cmd_autopsy(args: argparse.Namespace) -> int:
     print(f"wrote {args.out}")
     if args.json_out:
         print(f"wrote {args.json_out}")
+    if getattr(args, "fail_on_incident", False) and report["scorecard"]["status"] != "completed":
+        return 1
     return 0
 
 
@@ -734,6 +767,26 @@ def cmd_opencode(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_repo_preflight(args: argparse.Namespace) -> int:
+    try:
+        manifest = load_manifest(Path(args.manifest))
+        report = run_repo_preflight(Path(args.repo), manifest)
+    except (OSError, json.JSONDecodeError, ValueError, subprocess.TimeoutExpired) as exc:
+        print(f"repo preflight failed: {sanitize(str(exc))}", file=sys.stderr)
+        return 2
+
+    if args.json_out:
+        _atomic_write_text(Path(args.json_out), json.dumps(report, indent=2), private=True)
+        print(f"wrote {args.json_out}")
+    print(f"status: {report['status']}")
+    print(f"baseline: {report['baseline']}")
+    print(f"changed_file_count: {report['changed_file_count']}")
+    for finding in report["findings"]:
+        path = f" ({finding['path']})" if finding.get("path") else ""
+        print(f"finding: {finding['code']}{path}: {finding['message']}")
+    return 0 if report["status"] == "pass" else 1
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="agent-blackbox", description="Local-only incident forensics for AI agent runs")
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
@@ -751,18 +804,21 @@ def build_parser() -> argparse.ArgumentParser:
     why = sub.add_parser("why-no-response")
     why.add_argument("--platform", default="discord")
     why.add_argument("--minutes", type=int, default=180)
+    why.add_argument("--always-zero", action="store_true", help="Write the diagnosis without using its status as the process exit code")
     why.set_defaults(func=cmd_why)
 
     export = sub.add_parser("export-postmortem")
     export.add_argument("--platform", default="discord")
     export.add_argument("--minutes", type=int, default=180)
     export.add_argument("--out", required=True)
+    export.add_argument("--always-zero", action="store_true", help="Write the report without using its diagnosis as the process exit code")
     export.set_defaults(func=cmd_export)
 
     export_html = sub.add_parser("export-html", aliases=["visual"], help="Export a beautiful dark-themed HTML visual report")
     export_html.add_argument("--platform", default="discord")
     export_html.add_argument("--minutes", type=int, default=180)
     export_html.add_argument("--out", required=True)
+    export_html.add_argument("--always-zero", action="store_true", help="Write the report without using its diagnosis as the process exit code")
     export_html.set_defaults(func=cmd_export_html)
 
     search = sub.add_parser("search")
@@ -778,11 +834,13 @@ def build_parser() -> argparse.ArgumentParser:
 
     cron = sub.add_parser("cron")
     cron.add_argument("job", help="Cron job id or name substring")
+    cron.add_argument("--always-zero", action="store_true", help="Print the diagnosis without using its status as the process exit code")
     cron.set_defaults(func=cmd_cron)
 
     export_cron = sub.add_parser("export-cron-postmortem")
     export_cron.add_argument("job", help="Cron job id or name substring")
     export_cron.add_argument("--out", required=True)
+    export_cron.add_argument("--always-zero", action="store_true", help="Write the report without using its diagnosis as the process exit code")
     export_cron.set_defaults(func=cmd_export_cron)
 
     rec = sub.add_parser("record", help="Run a command and save a privacy-safe flight recording")
@@ -840,6 +898,7 @@ def build_parser() -> argparse.ArgumentParser:
     autopsy.add_argument("trace", help="Path to normalized JSON or JSONL events")
     autopsy.add_argument("--out", required=True, help="Path to write the standalone HTML report")
     autopsy.add_argument("--json-out", default=None, help="Optional path to write the score and sanitized evidence as JSON")
+    autopsy.add_argument("--fail-on-incident", action="store_true", help="Exit 1 when captured evidence is not a completed run")
     autopsy.set_defaults(func=cmd_autopsy)
 
     fight = sub.add_parser("fight", help="Rank two or more named traces by captured evidence score")
@@ -863,6 +922,12 @@ def build_parser() -> argparse.ArgumentParser:
     opc.add_argument("--opencode-dir", default=None, help="Override default OpenCode data directory")
     opc.set_defaults(func=cmd_opencode)
 
+    preflight = sub.add_parser("repo-preflight", help="Block agent changes that violate intended file scope or repository invariants")
+    preflight.add_argument("--repo", default=".", help="Git repository to inspect")
+    preflight.add_argument("--manifest", required=True, help="JSON file describing baseline, intended paths, and invariants")
+    preflight.add_argument("--json-out", default=None, help="Optional path to write the machine-readable report")
+    preflight.set_defaults(func=cmd_repo_preflight)
+
     return parser
 
 
@@ -880,9 +945,19 @@ def _diagnosis_exit_code(status: str, always_zero: bool = False) -> int:
 
 def _print_blackbox_analysis(analysis: dict) -> None:
     print(f"status: {analysis['status']}")
+    print(f"incident: {str(bool(analysis.get('incident'))).lower()}")
     print(f"user_prompts: {analysis['user_prompts']}")
     print(f"assistant_turns: {analysis['assistant_turns']}")
     print(f"tool_calls: {analysis['tool_calls']}")
+
+    quality = analysis.get("quality") or {}
+    if quality:
+        print(
+            "evidence_quality: "
+            f"events={quality.get('event_count', 0)} "
+            f"timestamped={quality.get('timestamped_event_count', 0)} "
+            f"gaps={len(quality.get('evidence_gaps') or [])}"
+        )
 
     if analysis.get("tools_used"):
         print("tools_used:")
@@ -911,6 +986,15 @@ def _print_blackbox_analysis(analysis: dict) -> None:
             print(f"  - {item['severity']} {item['code']} ({item['scope']}): {item['snippet']}")
     else:
         print("risk_findings: none")
+
+    if analysis.get("evidence_gaps") or quality.get("evidence_gaps"):
+        print("evidence_gaps:")
+        for item in (quality.get("evidence_gaps") or [])[:5]:
+            print(f"  - {item}")
+    if analysis.get("recommendations"):
+        print("recommendations:")
+        for item in analysis["recommendations"]:
+            print(f"  - {item}")
 
 
 def _print_session_findings(summary: dict) -> None:

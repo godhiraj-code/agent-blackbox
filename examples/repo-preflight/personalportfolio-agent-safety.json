@@ -1,0 +1,36 @@
+{
+  "baseline": "aa60eab",
+  "allow_paths": [
+    "public/agent-safety-doctor/**",
+    "public/rss.xml",
+    "public/sitemap.xml",
+    "src/App.jsx",
+    "src/components/AgentSafetyAuditPage.jsx",
+    "src/components/AnimatedRoutes.jsx"
+  ],
+  "protected_paths": [
+    "src/data/blogs.js",
+    "src/data/blogIndex.js"
+  ],
+  "max_changed_files": 8,
+  "invariants": [
+    {
+      "name": "blog routes remain registered",
+      "type": "text_required",
+      "glob": "src/components/AnimatedRoutes.jsx",
+      "regex": "path=\\\"/blog(?:/:id)?\\\""
+    },
+    {
+      "name": "blog dates stay hidden in visible components",
+      "type": "text_forbidden",
+      "glob": "src/components/Blog*.jsx",
+      "regex": "\\{\\s*blog\\.date\\s*\\}"
+    },
+    {
+      "name": "blog corpus files remain present",
+      "type": "glob_count",
+      "glob": "src/data/blog*.js",
+      "min": 2
+    }
+  ]
+}

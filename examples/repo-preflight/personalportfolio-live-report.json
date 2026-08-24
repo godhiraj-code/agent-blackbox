@@ -1,0 +1,104 @@
+{
+  "schema_version": "1.0",
+  "status": "blocked",
+  "repo": "personalportfolio",
+  "baseline": "aa60eab",
+  "changed_file_count": 14,
+  "changed_paths": [
+    ".firecrawl/developers.google.com-search-docs-appearance-structured-data-article.md",
+    ".firecrawl/developers.google.com-search-docs-appearance-structured-data-breadcrumb.md",
+    ".firecrawl/developers.google.com-search-docs-appearance-structured-data-intro-structured-data.md",
+    ".firecrawl/developers.google.com-search-docs-appearance-structured-data-profile-page.md",
+    ".firecrawl/developers.google.com-search-docs-appearance-structured-data-software-app.md",
+    "public/agent-safety-doctor/sample-report.html",
+    "public/hitha/index.html",
+    "public/rss.xml",
+    "public/sitemap.xml",
+    "scripts/add_visual_flight_recorder_blog.py",
+    "src/App.jsx",
+    "src/components/AgentSafetyAuditPage.jsx",
+    "src/components/AnimatedRoutes.jsx",
+    "src/data/blogs_test.mjs"
+  ],
+  "findings": [
+    {
+      "code": "outside_intended_scope",
+      "severity": "high",
+      "path": ".firecrawl/developers.google.com-search-docs-appearance-structured-data-article.md",
+      "message": "Changed path is outside allow_paths: .firecrawl/developers.google.com-search-docs-appearance-structured-data-article.md"
+    },
+    {
+      "code": "outside_intended_scope",
+      "severity": "high",
+      "path": ".firecrawl/developers.google.com-search-docs-appearance-structured-data-breadcrumb.md",
+      "message": "Changed path is outside allow_paths: .firecrawl/developers.google.com-search-docs-appearance-structured-data-breadcrumb.md"
+    },
+    {
+      "code": "outside_intended_scope",
+      "severity": "high",
+      "path": ".firecrawl/developers.google.com-search-docs-appearance-structured-data-intro-structured-data.md",
+      "message": "Changed path is outside allow_paths: .firecrawl/developers.google.com-search-docs-appearance-structured-data-intro-structured-data.md"
+    },
+    {
+      "code": "outside_intended_scope",
+      "severity": "high",
+      "path": ".firecrawl/developers.google.com-search-docs-appearance-structured-data-profile-page.md",
+      "message": "Changed path is outside allow_paths: .firecrawl/developers.google.com-search-docs-appearance-structured-data-profile-page.md"
+    },
+    {
+      "code": "outside_intended_scope",
+      "severity": "high",
+      "path": ".firecrawl/developers.google.com-search-docs-appearance-structured-data-software-app.md",
+      "message": "Changed path is outside allow_paths: .firecrawl/developers.google.com-search-docs-appearance-structured-data-software-app.md"
+    },
+    {
+      "code": "outside_intended_scope",
+      "severity": "high",
+      "path": "public/hitha/index.html",
+      "message": "Changed path is outside allow_paths: public/hitha/index.html"
+    },
+    {
+      "code": "outside_intended_scope",
+      "severity": "high",
+      "path": "scripts/add_visual_flight_recorder_blog.py",
+      "message": "Changed path is outside allow_paths: scripts/add_visual_flight_recorder_blog.py"
+    },
+    {
+      "code": "outside_intended_scope",
+      "severity": "high",
+      "path": "src/data/blogs_test.mjs",
+      "message": "Changed path is outside allow_paths: src/data/blogs_test.mjs"
+    },
+    {
+      "code": "change_budget_exceeded",
+      "severity": "high",
+      "path": null,
+      "message": "Changed file count 14 exceeds maximum 8"
+    }
+  ],
+  "invariants": [
+    {
+      "name": "blog routes remain registered",
+      "type": "text_required",
+      "passed": true,
+      "observed": [
+        "src/components/AnimatedRoutes.jsx"
+      ],
+      "message": "blog routes remain registered: expected at least one match for /path=\\\"/blog(?:/:id)?\\\"/ in src/components/AnimatedRoutes.jsx; matched 1 file(s)"
+    },
+    {
+      "name": "blog dates stay hidden in visible components",
+      "type": "text_forbidden",
+      "passed": true,
+      "observed": [],
+      "message": "blog dates stay hidden in visible components: expected no matches for /\\{\\s*blog\\.date\\s*\\}/ in src/components/Blog*.jsx; matched 0 file(s)"
+    },
+    {
+      "name": "blog corpus files remain present",
+      "type": "glob_count",
+      "passed": true,
+      "observed": 2,
+      "message": "blog corpus files remain present: found 2 files for src/data/blog*.js; expected min=2"
+    }
+  ]
+}

@@ -151,20 +151,32 @@ def event_from_dict(data: dict[str, Any]) -> BlackboxEvent:
     for key in ("arguments", "result", "command", "path"):
         if key in data and key not in metadata:
             metadata[key] = data[key]
+    timestamp = data.get("timestamp") or data.get("time") or data.get("ts")
+    tool_call_id = data.get("tool_call_id") or data.get("call_id") or data.get("id")
+    tool_name = data.get("tool_name") or data.get("name")
     return BlackboxEvent(
-        timestamp=data.get("timestamp") or data.get("time") or data.get("ts"),
+        timestamp=str(timestamp) if timestamp is not None else None,
         source=str(data.get("source") or "custom"),
-        session_id=data.get("session_id") or data.get("thread_id") or data.get("run_id"),
+        session_id=(str(data.get("session_id") or data.get("thread_id") or data.get("run_id"))
+                    if (data.get("session_id") or data.get("thread_id") or data.get("run_id")) is not None
+                    else None),
         event_type=str(event_type),
         severity=str(data.get("severity") or "INFO").upper(),
         summary=sanitize(str(data.get("summary") or data.get("message") or "")),
-        tool_call_id=data.get("tool_call_id") or data.get("call_id") or data.get("id"),
-        tool_name=data.get("tool_name") or data.get("name"),
+        tool_call_id=str(tool_call_id) if tool_call_id is not None else None,
+        tool_name=str(tool_name) if tool_name is not None else None,
         metadata={str(key): safe_json_excerpt(value) for key, value in metadata.items()},
     )
 
 
 def load_blackbox_events(path: Path) -> list[BlackboxEvent]:
+    try:
+        file_size = path.stat().st_size
+    except OSError:
+        raise
+    if file_size > MAX_EVENT_FILE_BYTES:
+        raise ValueError(f"event file exceeds {MAX_EVENT_FILE_BYTES} bytes; use a smaller trace")
+
     records: list[dict[str, Any]] = []
     if path.suffix.lower() == ".jsonl":
         with path.open("r", encoding="utf-8", errors="strict") as stream:
@@ -179,8 +191,6 @@ def load_blackbox_events(path: Path) -> list[BlackboxEvent]:
                     raise ValueError(f"invalid JSONL at line {line_number}: each record must be an object")
                 records.append(item)
     else:
-        if path.stat().st_size > MAX_EVENT_FILE_BYTES:
-            raise ValueError(f"event file exceeds {MAX_EVENT_FILE_BYTES} bytes; use JSONL for large traces")
         text = path.read_text(encoding="utf-8", errors="strict")
         if not text.strip():
             return []
@@ -331,6 +341,26 @@ def analyze_blackbox_events(events: Iterable[BlackboxEvent]) -> dict[str, Any]:
     user_prompts = 0
     assistant_turns = 0
 
+    timestamped_events = sum(1 for event in ordered if parse_iso_timestamp(event.timestamp))
+    invalid_timestamp_events = sum(
+        1 for event in ordered if event.timestamp is not None and parse_iso_timestamp(event.timestamp) is None
+    )
+    duplicate_event_keys: set[tuple[Any, ...]] = set()
+    duplicate_event_count = 0
+    for event in ordered:
+        key = (
+            event.timestamp,
+            event.source,
+            event.session_id,
+            event.event_type,
+            event.tool_call_id,
+            event.tool_name,
+            event.summary,
+        )
+        if key in duplicate_event_keys:
+            duplicate_event_count += 1
+        duplicate_event_keys.add(key)
+
     for index, event in enumerate(ordered, start=1):
         counts[event.event_type] = counts.get(event.event_type, 0) + 1
         severity = (event.severity or "INFO").upper()
@@ -409,6 +439,26 @@ def analyze_blackbox_events(events: Iterable[BlackboxEvent]) -> dict[str, Any]:
     else:
         status = "completed"
 
+    evidence_gaps: list[str] = []
+    if not ordered:
+        evidence_gaps.append("No events were captured.")
+    if invalid_timestamp_events:
+        evidence_gaps.append(f"{invalid_timestamp_events} event(s) have invalid timestamps and were ordered last.")
+    if any(event.timestamp is None for event in ordered):
+        evidence_gaps.append("Some events have no timestamp, so exact ordering and latency are uncertain.")
+    if duplicate_event_count:
+        evidence_gaps.append(f"{duplicate_event_count} duplicate event record(s) were retained; confirm whether the source retried delivery.")
+    if missed_calls:
+        evidence_gaps.append("At least one tool start has no matching result in the captured trace.")
+
+    recommendations = _analysis_recommendations(
+        status,
+        risk_findings,
+        missed_calls,
+        failed_calls,
+        errors,
+    )
+
     return {
         "schema_version": ANALYSIS_SCHEMA_VERSION,
         "status": status,
@@ -422,8 +472,43 @@ def analyze_blackbox_events(events: Iterable[BlackboxEvent]) -> dict[str, Any]:
         "missed_tool_calls": missed_calls,
         "errors": errors,
         "risk_findings": risk_findings[:12],
+        "quality": {
+            "event_count": len(ordered),
+            "timestamped_event_count": timestamped_events,
+            "untimestamped_event_count": sum(1 for event in ordered if event.timestamp is None),
+            "invalid_timestamp_count": invalid_timestamp_events,
+            "duplicate_event_count": duplicate_event_count,
+            "evidence_gaps": evidence_gaps,
+        },
+        "incident": status != "completed",
+        "recommendations": recommendations,
         "timeline": event_dicts(ordered),
     }
+
+
+def _analysis_recommendations(
+    status: str,
+    risks: list[dict[str, Any]],
+    missed_calls: list[dict[str, Any]],
+    failed_calls: list[dict[str, Any]],
+    errors: list[dict[str, Any]],
+) -> list[str]:
+    recommendations: list[str] = []
+    if missed_calls:
+        recommendations.append("Locate the missing tool result or mark the run incomplete before trusting its final message.")
+    if failed_calls:
+        recommendations.append("Reproduce the failed tool call with the captured arguments and inspect the first failure, not only the final summary.")
+    if errors and not failed_calls:
+        recommendations.append("Inspect the earliest error event and its surrounding tool call before retrying the run.")
+    if any(item.get("code") == "interactive_auth_flow" for item in risks):
+        recommendations.append("Preflight authentication outside the unattended run and use a non-interactive credential check.")
+    if any(item.get("code") == "missed_verification" for item in risks):
+        recommendations.append("Run an explicit test, lint, typecheck, or build command and capture its result.")
+    if any(item.get("severity") == "high" for item in risks):
+        recommendations.append("Review high-severity actions before rerunning; narrow permissions and confirm targets.")
+    if not recommendations and status == "completed":
+        recommendations.append("No incident signal was found in captured evidence; confirm task correctness separately.")
+    return list(dict.fromkeys(recommendations))[:6]
 
 
 def find_recordings(runs_dir: Path) -> list[Path]:

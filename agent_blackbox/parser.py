@@ -47,11 +47,32 @@ class Event:
     raw: str
 
 
+_TIMESTAMP_PREFIX = re.compile(
+    r"^\s*(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}"
+    r"(?:[.,]\d+)?(?:Z|[+-]\d{2}:?\d{2})?)"
+)
+
+
 def parse_timestamp(line: str) -> dt.datetime | None:
-    match = re.match(r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}),\d{3}", line)
+    """Parse the timestamp prefix used by gateway logs.
+
+    Gateway versions have emitted both ``YYYY-mm-dd HH:MM:SS,mmm`` and ISO
+    timestamps.  Internally we use naive UTC values so existing correlation
+    code can compare local log timestamps consistently.
+    """
+    match = _TIMESTAMP_PREFIX.match(line)
     if not match:
         return None
-    return dt.datetime.strptime(match.group(1), "%Y-%m-%d %H:%M:%S")
+    raw = match.group(1).replace(",", ".")
+    try:
+        parsed = dt.datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is not None:
+        parsed = parsed.astimezone(dt.timezone.utc).replace(tzinfo=None)
+    # Existing gateway diagnosis treats log timestamps as second-resolution;
+    # keep that stable while accepting fractional and timezone-bearing inputs.
+    return parsed.replace(microsecond=0)
 
 
 def sanitize(text: str) -> str:
@@ -110,10 +131,12 @@ def cron_output_dir(job_id: str, hermes_home: Path = DEFAULT_HERMES_HOME) -> Pat
 
 
 def read_events(minutes: int, hermes_home: Path = DEFAULT_HERMES_HOME) -> list[Event]:
+    if minutes < 0:
+        raise ValueError("minutes must be zero or positive")
     path = log_path(hermes_home)
     if not path.exists():
         return []
-    cutoff = dt.datetime.now() - dt.timedelta(minutes=minutes)
+    cutoff = dt.datetime.now(dt.timezone.utc).replace(tzinfo=None) - dt.timedelta(minutes=minutes)
     events: list[Event] = []
     for line in path.read_text(errors="ignore", encoding="utf-8").splitlines():
         event = parse_log_line(line)
@@ -130,16 +153,26 @@ def read_cron_jobs(hermes_home: Path = DEFAULT_HERMES_HOME) -> list[dict]:
     if not path.exists():
         return []
     data = json.loads(path.read_text(encoding="utf-8"))
-    return data.get("jobs", [])
+    if not isinstance(data, dict) or not isinstance(data.get("jobs", []), list):
+        raise ValueError("cron jobs file must contain an object with a jobs list")
+    return [job for job in data["jobs"] if isinstance(job, dict)]
 
 
 def find_cron_job(job_ref: str, hermes_home: Path = DEFAULT_HERMES_HOME) -> dict | None:
     needle = job_ref.lower()
+    matches: list[dict] = []
     for job in read_cron_jobs(hermes_home):
-        if job.get("id", "").lower() == needle:
+        job_id = str(job.get("id") or "").lower()
+        job_name = str(job.get("name") or "").lower()
+        if job_id == needle:
             return job
-        if needle in job.get("name", "").lower():
-            return job
+        if needle in job_name:
+            matches.append(job)
+    if len(matches) > 1:
+        names = ", ".join(str(job.get("name") or job.get("id") or "unnamed") for job in matches[:5])
+        raise ValueError(f"cron reference {job_ref!r} is ambiguous; matches: {names}")
+    if matches:
+        return matches[0]
     return None
 
 

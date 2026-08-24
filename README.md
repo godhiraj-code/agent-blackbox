@@ -77,7 +77,9 @@ agent-blackbox diagnose-run runs/run_<id>.json --out exports/run-postmortem.md
 agent-blackbox analyze-events path/to/events.jsonl --out exports/events-analysis.json
 agent-blackbox analyze-events path/to/events.jsonl --format json --fail-on-incident
 agent-blackbox autopsy path/to/events.jsonl --out exports/autopsy.html --json-out exports/autopsy.json
+agent-blackbox autopsy path/to/events.jsonl --out exports/autopsy.html --fail-on-incident
 agent-blackbox fight Baseline=path/to/baseline.jsonl Candidate=path/to/candidate.jsonl --out exports/fight.html --json-out exports/fight.json
+agent-blackbox repo-preflight --repo path/to/repo --manifest preflight.json --json-out preflight-report.json
 agent-blackbox claude --session <session-id-or-filename>
 agent-blackbox codex --session <session-id-or-filename>
 agent-blackbox opencode --session <session-id-or-export-json>
@@ -97,6 +99,8 @@ python agent_doctor.py search "Discord"
 
 `run-doctor` diagnoses the newest `run_*.json` recording, so users do not need to copy exact recording paths during an incident. Recorded-run postmortems include failure evidence and risk findings such as destructive shell commands, pipe-to-shell installers, sandbox/permission blocks, dependency/network failures, skipped verification language, and redacted secret exposure.
 
+Diagnostic commands use their findings as process exit codes by default: `why-no-response`, `cron`, and their export variants return `1` for an unhealthy diagnosis and `2` for missing or invalid input. Add `--always-zero` when a report is informational and must not gate a wrapper. `autopsy --fail-on-incident` provides the same opt-in CI gate for normalized traces while keeping report generation successful by default.
+
 Recording is sanitized-only by default:
 
 ```bash
@@ -108,6 +112,25 @@ agent-blackbox record --show-raw-console -- your-agent command
 ```
 
 `--store-raw` can persist credentials, source code, personal data, and model context. Do not use it in shared CI runners or check its output into Git. The redactor is defense in depth, not a proof that arbitrary data is anonymous.
+
+### Repository-scope preflight
+
+`repo-preflight` is a deterministic final-diff gate for agent work. A JSON manifest pins a baseline commit, lists the paths the task is allowed to change, optionally protects paths and limits the total change count, and checks repository invariants before a publish or push decision:
+
+```json
+{
+  "baseline": "HEAD",
+  "allow_paths": ["src/feature/**", "tests/test_feature.py"],
+  "protected_paths": ["src/data/**"],
+  "max_changed_files": 6,
+  "invariants": [
+    {"name": "routes remain", "type": "text_required", "glob": "src/routes.*", "regex": "/blog"},
+    {"name": "corpus remains", "type": "glob_count", "glob": "content/*.md", "min": 10}
+  ]
+}
+```
+
+The command includes untracked files and exits `1` when a change is outside intended scope, touches a protected path, exceeds the file budget, or violates a `glob_count`, `text_required`, or `text_forbidden` invariant. It does not decide whether an extra change is bad; it blocks mixed or unexplained work so a human or higher-level workflow can separate it first. See `examples/repo-preflight/` for an honest blocked report from a local mixed-worktree case.
 
 Claude, Codex, and OpenCode session commands use the shared black-box analyzer to identify:
 
@@ -131,6 +154,8 @@ The supported normalized contract is schema major version `1`. A JSON envelope s
 ```
 
 Unsupported schema versions, unknown event types, malformed records, non-object records, and empty input fail closed with exit code `2`; they are never reported as a completed run.
+
+Normalized analysis also reports evidence quality: missing or invalid timestamps, duplicate records, and tool starts without matching results are surfaced as explicit gaps. Recommendations are derived from the captured evidence and remain separate from task-correctness claims.
 
 ### Exit codes
 
