@@ -115,13 +115,14 @@ def read_events(minutes: int, hermes_home: Path = DEFAULT_HERMES_HOME) -> list[E
         return []
     cutoff = dt.datetime.now() - dt.timedelta(minutes=minutes)
     events: list[Event] = []
-    for line in path.read_text(errors="ignore", encoding="utf-8").splitlines():
-        event = parse_log_line(line)
-        if not event:
-            continue
-        if event.timestamp and event.timestamp < cutoff:
-            continue
-        events.append(event)
+    with path.open(errors="ignore", encoding="utf-8") as stream:
+        for line in stream:
+            event = parse_log_line(line)
+            if not event:
+                continue
+            if event.timestamp and event.timestamp < cutoff:
+                continue
+            events.append(event)
     return events
 
 
